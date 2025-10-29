@@ -26,6 +26,8 @@ F. Additional Content which is provided for an additional fee, can be redistribu
 
 G. Certain Additional Content is distributed under the "Free to use with NeoAxis" license. This means that the content can only be used with the Engine Code.
 
+H. Notwithstanding any other provision of this Agreement, companies, entities, organizations, or other legal persons that are owned, controlled by, or otherwise subject to significant state participation, majority state ownership, or majority state control of the governments of Russia, Belarus or Geogria (each, a "Restricted State Entity") are prohibited from using, licensing, distributing, sublicensing, modifying, or otherwise exploiting the Technology. Licensee represents and warrants that it is not a Restricted State Entity, and that no Restricted State Entity will use the Technology through Licensee (including by acquisition, transfer, subcontract, or similar arrangement). If Licensee becomes a Restricted State Entity or is acquired by or comes under the control of a Restricted State Entity, Licensee must immediately cease all use of the Technology and promptly notify Licensor. Any purported license, sublicense, transfer, or other right granted to a Restricted State Entity shall be null and void.
+
 If you do not accept these conditions or it is not enforceable in your jurisdiction, then you may not use the software.
 
 3. COPYRIGHT
