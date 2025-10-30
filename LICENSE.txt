@@ -26,7 +26,7 @@ F. Additional Content which is provided for an additional fee, can be redistribu
 
 G. Certain Additional Content is distributed under the "Free to use with NeoAxis" license. This means that the content can only be used with the Engine Code.
 
-H. For companies with government participation from Russia, Belarus, or Georgia, the royalty is 15%.
+H. For companies with government participation from Russia or Belarus the royalty is 15%.
 
 If you do not accept these conditions or it is not enforceable in your jurisdiction, then you may not use the software.
 
