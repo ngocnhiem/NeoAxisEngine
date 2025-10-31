@@ -4,11 +4,13 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Net;
+using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
-using Internal.WebSocketSharp;
-using Internal.WebSocketSharp.Server;
+using System.Threading.Tasks;
 
 namespace NeoAxis.Networking
 {
@@ -16,17 +18,19 @@ namespace NeoAxis.Networking
 	{
 		readonly static bool trace = false;
 		internal const int maxServiceIdentifier = 255;
+		static string predefinedHost = "localhost";
 
 		static List<ServerNode> instances = new List<ServerNode>();
 
 		bool disposed;
 
-		//general
+		//common
 		string serverName;
 		string serverVersion;
 		int maxConnections;
 		double defaultMaxLifetime;
-		int receiveDataMaxMessageSize = 10 * 1024 * 1024;
+		int sendMessageMaxSize = 10 * 1024 * 1024;
+		int receiveMessageMaxSize = 11 * 1024 * 1024;
 
 		//profiler
 		ProfilerDataClass profilerData;
@@ -37,7 +41,8 @@ namespace NeoAxis.Networking
 		ReadOnlyCollection<ServerService> servicesReadOnly;
 
 		//server data
-		internal WebSocketServer server;
+		internal HttpListener server;
+		//double keepAliveInSeconds;
 		ConcurrentQueue<Client> connectingClients = new ConcurrentQueue<Client>();
 		ConcurrentQueue<(Client, string)> disapprovedClosingClients = new ConcurrentQueue<(Client, string)>();
 		ESet<Client> clients = new ESet<Client>();
@@ -46,7 +51,8 @@ namespace NeoAxis.Networking
 		DateTime dropByMaxLifetimeLastTime;
 
 		Thread thread;
-		bool threadNeedExit;
+		volatile bool threadNeedExit;
+		//AutoResetEvent threadNeedUpdate = new AutoResetEvent( true );
 
 		//these values are changed from a background thread
 		internal long totalDataMessagesReceivedCounter;
@@ -84,6 +90,7 @@ namespace NeoAxis.Networking
 			public long LoginDataUserID { get; set; }
 			public string LoginDataUsername { get; set; }
 			public object Tag { get; set; }
+			public CloudUserRole UserRole { get; set; }
 
 			List<string> remoteServices;
 			ReadOnlyCollection<string> remoteServicesAsReadOnly;
@@ -92,9 +99,14 @@ namespace NeoAxis.Networking
 			internal ConcurrentQueue<ReceivedMessage> receivedMessages = new ConcurrentQueue<ReceivedMessage>();
 			internal ConcurrentQueue<ToProcessMessage> toProcessMessages = new ConcurrentQueue<ToProcessMessage>();
 
-			internal ArrayDataWriter accumulatedMessagesToSend = new ArrayDataWriter();
+			ArrayDataWriter accumulatedMessagesToSend = new ArrayDataWriter();
 
-			//ArrayDataWriter sendCachedDataWriter = new ArrayDataWriter();
+			public ConcurrentDictionary<string, object> AnyData = new ConcurrentDictionary<string, object>();
+
+			public NetworkAggregateConnectionStatistics AggregateConnectionStatistics;
+
+			public DateTime? mustNormalDisconnectTime;
+
 			//internal float lastRoundtripTime;
 
 			/////////////////////
@@ -223,10 +235,9 @@ namespace NeoAxis.Networking
 
 			public class ReceivedMessage
 			{
-				//public string DataString;
 				public byte[] DataBinary;
 				public string CloseReason;
-				public CloseStatusCode CloseCode;
+				public WebSocketCloseStatus? CloseCode;
 				public string ErrorMessage;
 			}
 
@@ -238,10 +249,9 @@ namespace NeoAxis.Networking
 
 				public bool DataBinary;
 				public byte[] DataBinaryArray;
-				//public ArraySegment<byte> DataBinarySegment;
 
 				public bool Close;
-				public CloseStatusCode CloseStatusCode;
+				public WebSocketCloseStatus CloseStatusCode;
 				public string CloseReason;
 			}
 
@@ -332,27 +342,77 @@ namespace NeoAxis.Networking
 			public string GetAddressText()
 			{
 				return RemoteEndPoint.ToString();
-
-				//string text;
-				//if( RemoteEndPoint != null )
-				//	text = RemoteEndPoint.ToString();
-				//else
-				//	text = "Unknown address";
-				//return text;
 			}
 
 			public double GetCurrentLifetime()
 			{
 				return ( DateTime.UtcNow - CreationTime ).TotalSeconds;
 			}
+
+			static string ClampCloseReason( string reason )
+			{
+				var reasonClamped = reason;
+				if( reasonClamped.Length > 110 )
+					reasonClamped = reason.Substring( 0, 110 ) + "...";
+				return reasonClamped;
+			}
+
+			internal async Task CloseAsync( WebSocketCloseStatus status, string rejectReason )
+			{
+				var webSocket = connection.webSocketContext.WebSocket;
+				await webSocket.CloseAsync( status, rejectReason != null ? ClampCloseReason( rejectReason ) : null, CancellationToken.None );
+			}
+
+			public void Destroy()
+			{
+				try
+				{
+					var httpContext = connection.httpContext;
+					httpContext?.Response.Close();
+
+					//what else to delete?
+				}
+				catch { }
+			}
+
+			internal void ProcessAccumulatedMessagesToSend()
+			{
+				lock( accumulatedMessagesToSend )
+				{
+					if( accumulatedMessagesToSend.Length > 0 )
+					{
+						var array = accumulatedMessagesToSend.ToArray();
+						toProcessMessages.Enqueue( new ToProcessMessage { DataBinary = true, DataBinaryArray = array } );
+						accumulatedMessagesToSend.Reset();
+					}
+				}
+			}
+
+			[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+			internal int AddAccumulatedMessageToSend( ArrayDataWriter writer )
+			{
+				int bytesWritten;
+				lock( accumulatedMessagesToSend )
+				{
+					var newCount = accumulatedMessagesToSend.Length + writer.Length + 4;
+					if( newCount > owner.sendMessageMaxSize )
+						ProcessAccumulatedMessagesToSend();
+
+					bytesWritten = accumulatedMessagesToSend.WriteVariableUInt32( (uint)writer.Length );
+					accumulatedMessagesToSend.Write( writer.Data, 0, writer.Length );
+				}
+				return bytesWritten;
+			}
 		}
 
 		///////////////////////////////////////////////
 
-		public class MyWebSocketBehavior : WebSocketBehavior
+		public class MyWebSocketBehavior
 		{
 			internal ServerNode owner;
+			internal HttpListenerWebSocketContext webSocketContext;
 			Client client;
+			internal HttpListenerContext httpContext;
 
 			//these values are changed from a background thread
 			internal long dataMessagesReceivedCounter;
@@ -366,23 +426,22 @@ namespace NeoAxis.Networking
 
 			public ServerNode Owner { get { return owner; } }
 
-			protected override void OnOpen()
+			[MethodImpl( (MethodImplOptions)512 )]
+			public async Task HandleConnection()
 			{
-				base.OnOpen();
-
 				try
 				{
 					if( owner.GetClientsArray().Length >= owner.maxConnections )
 						throw new Exception( $"The maximum connections limit has been reached, which is set at {owner.maxConnections}." );
 
-					var userEndPoint = UserEndPoint;
+					var userEndPoint = httpContext.Request.RemoteEndPoint;
 					if( userEndPoint == null )
 						throw new Exception( "UserEndPoint is null." );
 
 					if( trace )
 						Log.Info( "OnOpen " + userEndPoint.ToString() );
 
-					var welcomeBase64 = QueryString.Get( "welcome" );
+					var welcomeBase64 = httpContext.Request.QueryString[ "welcome" ];
 					if( string.IsNullOrEmpty( welcomeBase64 ) )
 						throw new Exception( "Invalid welcome parameter." );
 
@@ -419,60 +478,83 @@ namespace NeoAxis.Networking
 				}
 				catch( Exception e )
 				{
-					Close( CloseStatusCode.InvalidData, e.Message );
+					httpContext.Response.StatusCode = 400;
+					httpContext.Response.StatusDescription = e.Message;
+					httpContext.Response.Close();
+					return;
 				}
-			}
 
-			protected override void OnClose( CloseEventArgs e )
-			{
-				base.OnClose( e );
-
-				//try
-				//{
-
-				var reason = e.Reason ?? "";
-				client.receivedMessages.Enqueue( new Client.ReceivedMessage { CloseReason = reason, CloseCode = (CloseStatusCode)e.Code } );
-
-				if( trace )
-					Log.Info( "OnClose " + client.RemoteEndPoint.ToString() + " " + reason );
-
-				//}
-				//catch( Exception ex )
-				//{
-				//	if( trace )
-				//		Log.Info( "OnClose exception: " + ex.ToString() );
-				//}
-
-			}
-
-			protected override void OnError( ErrorEventArgs e )
-			{
-				base.OnError( e );
-
-				var message = e.Message ?? "";
-				client.receivedMessages.Enqueue( new Client.ReceivedMessage { ErrorMessage = message } );
-
-				if( trace )
-					Log.Info( "OnError " + client.RemoteEndPoint.ToString() + " " + message );
-
-				//!!!!need?
 				try
 				{
-					Close( CloseStatusCode.ServerError, message );
+					var webSocket = webSocketContext.WebSocket;
+
+					var accumulatedBuffer = new ArrayDataWriter( 1024 );
+					var buffer = new byte[ 1024 * 16 ];
+
+					while( webSocket.State == WebSocketState.Open )
+					{
+						var result = await webSocket.ReceiveAsync( new ArraySegment<byte>( buffer ), CancellationToken.None );
+
+						if( result.MessageType != WebSocketMessageType.Close )
+						{
+							accumulatedBuffer.Write( buffer, 0, result.Count );
+
+							//check for max message size
+							if( accumulatedBuffer.Length > owner.ReceiveMessageMaxSize )
+							{
+								var error = $"The size of the received message is too large. The maximum size is {owner.ReceiveMessageMaxSize} bytes.";
+								try
+								{
+									await client.CloseAsync( WebSocketCloseStatus.MessageTooBig, error );
+								}
+								catch { }
+							}
+
+							if( result.EndOfMessage )
+							{
+								await OnMessage( result.MessageType, accumulatedBuffer.AsArraySegment() );
+								accumulatedBuffer.Reset();
+							}
+						}
+						else
+						{
+							OnClose( WebSocketCloseStatus.NormalClosure, result.CloseStatusDescription );
+							break;
+						}
+					}
 				}
-				catch { }
+				catch( Exception e )
+				{
+					//Log.Info( "Exception " + e.Message );
+
+					httpContext.Response.StatusCode = 400;
+					httpContext.Response.StatusDescription = e.Message;
+					httpContext.Response.Close();
+
+					OnClose( WebSocketCloseStatus.ProtocolError, e.Message );
+				}
 			}
 
-			protected override void OnMessage( MessageEventArgs e )
+			public static async void HandleConnectionStatic( object state )
 			{
-				base.OnMessage( e );
+				await ( (MyWebSocketBehavior)state ).HandleConnection();
+			}
 
-				if( e.IsPing )
+			void OnClose( WebSocketCloseStatus closeStatus, string statusDescription )
+			{
+				client.receivedMessages.Enqueue( new Client.ReceivedMessage { CloseReason = statusDescription, CloseCode = closeStatus } );
+
+				if( trace )
 				{
-					if( trace )
-						Log.Info( "OnMessage Ping" );
+					var statusDescription2 = statusDescription ?? "(No status)";
+					Log.Info( $"OnClose {client.RemoteEndPoint} {closeStatus} {statusDescription2}" );
 				}
-				else if( e.IsText )
+			}
+
+			[MethodImpl( (MethodImplOptions)512 )]
+			async Task OnMessage( WebSocketMessageType messageType, ArraySegment<byte> buffer )
+			{
+				if( messageType == WebSocketMessageType.Text )
 				{
 					//system commands
 
@@ -481,11 +563,9 @@ namespace NeoAxis.Networking
 
 					try
 					{
-						var text = e.Data;
+						//? check for hard to parse text block. maybe then not use TextBlock. or use limits when parsing
 
-						//!!!!check for hard to parse text block. maybe then not use TextBlock
-						//!!!!!or use limits when parsing
-
+						var text = Encoding.UTF8.GetString( buffer );
 						if( text.Length > 1000 )
 							throw new Exception( "The system message is more than 1000 characters." );
 
@@ -512,66 +592,48 @@ namespace NeoAxis.Networking
 					{
 						try
 						{
-							Close( CloseStatusCode.ProtocolError, ex.Message );
+							await client.CloseAsync( WebSocketCloseStatus.ProtocolError, ex.Message );
 						}
 						catch { }
 					}
-
-					//client.receivedMessages.Enqueue( new Client.ReceivedMessage { DataString = e.Data } );
-
 				}
-				else if( e.IsBinary )
+				else if( messageType == WebSocketMessageType.Binary )
 				{
-					//data commands
+					//data command
 
-					var data = e.RawData;
+					var data = buffer.ToArray();
+					var length = data.Length;
 
 					unchecked
 					{
-						Interlocked.Increment( ref dataMessagesReceivedCounter ); //dataMessagesReceivedCounter++;
-						Interlocked.Add( ref dataSizeReceivedCounter, data.Length );
+						Interlocked.Increment( ref dataMessagesReceivedCounter );
+						Interlocked.Add( ref dataSizeReceivedCounter, length );
 						foreach( var b in data )
 							dataMessagesReceivedChecksum += b;
 						Interlocked.Increment( ref owner.totalDataMessagesReceivedCounter );
-						Interlocked.Add( ref owner.totalDataSizeReceivedCounter, data.Length );
+						Interlocked.Add( ref owner.totalDataSizeReceivedCounter, length );
+						client.AggregateConnectionStatistics?.AddReceived( length );
 					}
 
 					if( trace )
-						Log.Info( $"OnMessage Binary {data.Length} {DataMessagesReceivedCounter} {dataMessagesReceivedChecksum}" );
+						Log.Info( $"OnMessage Binary {length} {DataMessagesReceivedCounter} {dataMessagesReceivedChecksum}" );
 
-					if( data.Length > owner.ReceiveDataMaxMessageSize )
-					{
-						var error = $"The size of the received message is too large. The maximum size is {owner.ReceiveDataMaxMessageSize} bytes.";
-						try
-						{
-							Close( CloseStatusCode.ProtocolError, error );
-						}
-						catch { }
-					}
-					else
-					{
-						//totalBytesReceived += data.Length;
+					client.receivedMessages.Enqueue( new Client.ReceivedMessage { DataBinary = data } );
 
-						//!!!!without copy?
-
-						client.receivedMessages.Enqueue( new Client.ReceivedMessage { DataBinary = (byte[])data.Clone() } );
-					}
+					////if( length > owner.ReceiveDataMaxMessageSize )
+					////{
+					////	var error = $"The size of the received message is too large. The maximum size is {owner.ReceiveDataMaxMessageSize} bytes.";
+					////	try
+					////	{
+					////		await client.CloseAsync( WebSocketCloseStatus.MessageTooBig, error );
+					////	}
+					////	catch { }
+					////}
+					////else
+					////{
+					////client.receivedMessages.Enqueue( new Client.ReceivedMessage { DataBinary = data } );
+					////}
 				}
-			}
-
-			internal void Send2( string data )
-			{
-				Send( data );
-			}
-
-			internal void Send2( byte[] data )
-			{
-				Send( data );
-			}
-
-			internal void Close2( CloseStatusCode code, string reason )
-			{
-				Close( code, reason );
 			}
 
 			public long DataMessagesReceivedCounter
@@ -594,14 +656,12 @@ namespace NeoAxis.Networking
 				get { return Interlocked.Read( ref dataSizeSentCounter ); }
 			}
 
-			//!!!!
 			//public void GetDataMessagesStatistics( DateTime utcNow, out double receivedMessagesPerSecond, out double reveivedSizePerSecond, out double sentMessagesPerSecond, out double sentSizePerSecond )
 			//{
 			//	receivedMessagesPerSecond = 0;
 			//	reveivedSizePerSecond = 0;
 			//	sentMessagesPerSecond = 0;
 			//	sentSizePerSecond = 0;
-
 			//}
 		}
 
@@ -612,14 +672,15 @@ namespace NeoAxis.Networking
 			//const data
 			public DateTime TimeStarted;
 			public double WorkingTime;
+			//from ClientNode:
 			//public long SystemMessagesReceivedStartCounter;
 			//public long SystemMessagesSentStartCounter;
 
 			//dynamic data
 			public long TotalReceivedMessages;
 			public long TotalReceivedSize;
-			public long TotalSentMessages;
-			public long TotalSentSize;
+			public long TotalSentMessages; //using Interlocked
+			public long TotalSentSize; //using Interlocked
 			public List<ServiceItem> Services = new List<ServiceItem>();
 
 			/////////////////////
@@ -634,8 +695,8 @@ namespace NeoAxis.Networking
 				{
 					public long ReceivedMessages;
 					public long ReceivedSize;
-					public long SentMessages;
-					public long SentSize;
+					public long SentMessages; //using Interlocked
+					public long SentSize; //using Interlocked
 
 					public struct CustomData
 					{
@@ -691,6 +752,19 @@ namespace NeoAxis.Networking
 
 		///////////////////////////////////////////////
 
+		public static string PredefinedHost
+		{
+			get { return predefinedHost; }
+		}
+
+		//public double KeepAliveInSeconds
+		//{
+		//	get { return keepAliveInSeconds; }
+		//	set { keepAliveInSeconds = value; }
+		//}
+
+		public static string BeginListenLastError { get; set; } = string.Empty;
+
 		public static ServerNode[] GetInstances()
 		{
 			lock( instances )
@@ -718,6 +792,7 @@ namespace NeoAxis.Networking
 			profilerData = new ProfilerDataClass();
 			profilerData.TimeStarted = DateTime.UtcNow;
 			profilerData.WorkingTime = workingTime;
+			//from ClientNode:
 			//profilerData.SystemMessagesReceivedStartCounter = DataMessagesReceivedCounter;
 			//profilerData.SystemMessagesSentStartCounter = DataMessagesSentCounter;
 
@@ -754,7 +829,7 @@ namespace NeoAxis.Networking
 			var lines = new List<string>();
 
 			lines.Add( "--------------------------------------------------------------" );
-			lines.Add( string.Format( "Total received; {0}", NetworkUtility.FormatSize( profilerData.TotalReceivedSize ) ) );
+			lines.Add( string.Format( "Total received; {0}", StringUtility.FormatSize( profilerData.TotalReceivedSize ) ) );
 			//lines.Add( string.Format( "Total received. Messages: {0}; Size: {1}", FormatCount( profilerData.TotalReceivedMessages ), FormatSize( profilerData.TotalReceivedSize ) ) );
 
 			for( int serviceId = 0; serviceId < profilerData.Services.Count; serviceId++ )
@@ -794,7 +869,7 @@ namespace NeoAxis.Networking
 
 						var messageType = service.GetMessageType( messageTypeId );
 
-						lines.Add( string.Format( "> > {0}; Messages: {1}; Size: {2}", messageType.Name, FormatCount( messageByTypeItem.ReceivedMessages ), NetworkUtility.FormatSize( messageByTypeItem.ReceivedSize ) ) );
+						lines.Add( string.Format( "> > {0}; Messages: {1}; Size: {2}", messageType.Name, FormatCount( messageByTypeItem.ReceivedMessages ), StringUtility.FormatSize( messageByTypeItem.ReceivedSize ) ) );
 
 						var customData = messageByTypeItem.ReceivedCustomData;
 						if( customData != null )
@@ -814,7 +889,7 @@ namespace NeoAxis.Networking
 
 							foreach( var item in items )
 							{
-								lines.Add( string.Format( "> > > {0}; Messages: {1}; Size: {2}", item.Item1, FormatCount( item.Item2.Messages ), NetworkUtility.FormatSize( item.Item2.Size ) ) );
+								lines.Add( string.Format( "> > > {0}; Messages: {1}; Size: {2}", item.Item1, FormatCount( item.Item2.Messages ), StringUtility.FormatSize( item.Item2.Size ) ) );
 							}
 						}
 					}
@@ -858,7 +933,7 @@ namespace NeoAxis.Networking
 			}
 
 			lines.Add( "--------------------------------------------------------------" );
-			lines.Add( string.Format( "Total sent; Size: {0}", NetworkUtility.FormatSize( profilerData.TotalSentSize ) ) );
+			lines.Add( string.Format( "Total sent; Size: {0}", StringUtility.FormatSize( Interlocked.Read( ref profilerData.TotalSentSize ) ) ) );
 			//lines.Add( string.Format( "Total sent. Messages: {0}; Size: {1}", FormatCount( profilerData.TotalSentMessages ), FormatSize( profilerData.TotalSentSize ) ) );
 
 			for( int serviceId = 0; serviceId < profilerData.Services.Count; serviceId++ )
@@ -877,16 +952,16 @@ namespace NeoAxis.Networking
 						if( messageType != null )
 						{
 							var messageByTypeItem = serviceItem.GetMessageTypeItem( messageTypeId );
-							if( messageByTypeItem != null && messageByTypeItem.SentMessages != 0 )
+							if( messageByTypeItem != null && Interlocked.Read( ref messageByTypeItem.SentMessages ) != 0 )
 								messageByTypeItems.Add( (messageByTypeItem, messageTypeId) );
 						}
 					}
 
 					CollectionUtility.MergeSort( messageByTypeItems, delegate ( (ProfilerDataClass.ServiceItem.MessageTypeItem, int) item1, (ProfilerDataClass.ServiceItem.MessageTypeItem, int) item2 )
 					{
-						if( item1.Item1.SentSize > item2.Item1.SentSize )
+						if( Interlocked.Read( ref item1.Item1.SentSize ) > Interlocked.Read( ref item2.Item1.SentSize ) )
 							return -1;
-						if( item1.Item1.SentSize < item2.Item1.SentSize )
+						if( Interlocked.Read( ref item1.Item1.SentSize ) < Interlocked.Read( ref item2.Item1.SentSize ) )
 							return 1;
 						return 0;
 					} );
@@ -898,7 +973,7 @@ namespace NeoAxis.Networking
 
 						var messageType = service.GetMessageType( messageTypeId );
 
-						lines.Add( string.Format( "> > {0}; Messages: {1}; Size: {2}", messageType.Name, FormatCount( messageByTypeItem.SentMessages ), NetworkUtility.FormatSize( messageByTypeItem.SentSize ) ) );
+						lines.Add( string.Format( "> > {0}; Messages: {1}; Size: {2}", messageType.Name, FormatCount( Interlocked.Read( ref messageByTypeItem.SentMessages ) ), StringUtility.FormatSize( Interlocked.Read( ref messageByTypeItem.SentSize ) ) ) );
 
 						var customData = messageByTypeItem.SentCustomData;
 						if( customData != null )
@@ -918,7 +993,7 @@ namespace NeoAxis.Networking
 
 							foreach( var item in items )
 							{
-								lines.Add( string.Format( "> > > {0}; Messages: {1}; Size: {2}", item.Item1, FormatCount( item.Item2.Messages ), NetworkUtility.FormatSize( item.Item2.Size ) ) );
+								lines.Add( string.Format( "> > > {0}; Messages: {1}; Size: {2}", item.Item1, FormatCount( item.Item2.Messages ), StringUtility.FormatSize( item.Item2.Size ) ) );
 							}
 						}
 					}
@@ -995,8 +1070,9 @@ namespace NeoAxis.Networking
 			servicesReadOnly = new ReadOnlyCollection<ServerService>( services );
 		}
 
-		public bool BeginListen( int port, double connectionTimeout, out string error )
+		public bool BeginListen( bool https, string host, int port, /*double keepAliveInSeconds, */out string error )
 		{
+			//this.keepAliveInSeconds = keepAliveInSeconds;
 			error = null;
 
 #if !UWP
@@ -1005,45 +1081,57 @@ namespace NeoAxis.Networking
 			if( server != null )
 				Log.Fatal( "ServerNode: BeginListen: The server is already initialized." );
 
+			server = new HttpListener();
 
-			thread = new Thread( ThreadFunction );
-			thread.IsBackground = true;
-			thread.Start();
+			var prefix = https ? "https" : "http";
+			var host2 = host;
+			if( string.IsNullOrEmpty( host2 ) )
+				host2 = PredefinedHost;
+			server.Prefixes.Add( $"{prefix}://{host2}:{port}/service/" );
 
+			//server.Prefixes.Add( $"{prefix}://*:{port}/service/" );
+			//server.Prefixes.Add( $"{prefix}://localhost:{port}/service/" );
 
-			//!!!!bool secure
-
-			//!!!!limit max message size?
-
-			server = new WebSocketServer( port );
-			server.WaitTime = TimeSpan.FromSeconds( connectionTimeout );
-			server.KeepClean = true;
-
-			server.AddWebSocketService( "/service", delegate ( MyWebSocketBehavior behavior )
-			{
-				behavior.owner = this;
-			} );
-
-
-			//server.Log.Level = LogLevel.Trace;
-
-			//lidgren
-			//config.ReceiveBufferSize = 131071 * 10;
-			//config.SendBufferSize = 131071 * 10;
-			//config.AutoExpandMTU = true;//with it much faster
-
+			//server.TimeoutManager.IdleConnection = 
 
 			try
 			{
 				//start listening for connections
 				server.Start();
-
 				if( !server.IsListening )
 					throw new Exception( "The server is not listening." );
+
+				//run task to receive messages
+				Task.Run( async delegate ()
+				{
+					while( server.IsListening )
+					{
+						var httpContext = await server.GetContextAsync();
+						if( httpContext.Request.IsWebSocketRequest )
+						{
+							var webSocketContext = await httpContext.AcceptWebSocketAsync( subProtocol: null );
+							var myWebSocketBehavior = new MyWebSocketBehavior { owner = this, webSocketContext = webSocketContext, httpContext = httpContext };
+
+							var task = new Task( MyWebSocketBehavior.HandleConnectionStatic, myWebSocketBehavior );
+							task.Start();
+						}
+						else
+						{
+							httpContext.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+							httpContext.Response.Close();
+						}
+					}
+				} );
+
+				//start thread
+				thread = new Thread( ThreadFunction );
+				thread.IsBackground = true;
+				thread.Start();
 			}
 			catch( Exception e )
 			{
 				error = e.Message;
+				BeginListenLastError = error;
 				return false;
 			}
 
@@ -1054,12 +1142,12 @@ namespace NeoAxis.Networking
 #endif
 		}
 
-		void ThreadFunction( object param )
+		[MethodImpl( (MethodImplOptions)512 )]
+		async void ThreadFunction( object param )
 		{
 
-			//!!!!non thread variant
-
-			//!!!!slowly? GC?
+			//!!!!more optimizations. parallelism
+			//await or Task.Run?
 
 
 			while( !Disposed && !threadNeedExit )
@@ -1067,21 +1155,10 @@ namespace NeoAxis.Networking
 				foreach( var client in GetClientsArray() )
 				{
 					var connection = client.Connection;
+					var webSocket = connection.webSocketContext.WebSocket;
 
 					while( connection != null && client.toProcessMessages.TryDequeue( out var message ) )
 					{
-						//if( message.DataString != null )
-						//{
-						//	//try
-						//	//{
-						//	//	connection.Send2( message.DataString );
-						//	//}
-						//	//catch( Exception e )
-						//	//{
-						//	//	connection.Close2( CloseStatusCode.ProtocolError, "Unable to send the string message. " + e.Message );
-						//	//}
-						//}
-						//else 
 						if( message.DataBinary )
 						{
 							try
@@ -1090,12 +1167,13 @@ namespace NeoAxis.Networking
 
 								unchecked
 								{
-									Interlocked.Increment( ref connection.dataMessagesSentCounter ); //connection.dataMessagesSentCounter++;
+									Interlocked.Increment( ref connection.dataMessagesSentCounter );
 									Interlocked.Add( ref connection.dataSizeSentCounter, data.Length );
 									foreach( var b in data )
 										connection.dataMessagesSentChecksum += b;
 									Interlocked.Increment( ref totalDataMessagesSentCounter );
 									Interlocked.Add( ref totalDataSizeSentCounter, data.Length );
+									client.AggregateConnectionStatistics?.AddSent( data.Length );
 								}
 
 								if( trace )
@@ -1103,12 +1181,11 @@ namespace NeoAxis.Networking
 									Log.Info( $"Send Binary {data.Length} {connection.DataMessagesSentCounter} {connection.dataMessagesSentChecksum}" );
 								}
 
-								//!!!!GC inside
-								connection.Send2( data );
+								await webSocket.SendAsync( new ArraySegment<byte>( data ), WebSocketMessageType.Binary, true, CancellationToken.None );
 							}
 							catch( Exception e )
 							{
-								connection.Close2( CloseStatusCode.ProtocolError, "Unable to send the binary message. " + e.Message );
+								await client.CloseAsync( WebSocketCloseStatus.ProtocolError, "Unable to send the binary message. " + e.Message );
 								break;
 							}
 
@@ -1126,11 +1203,12 @@ namespace NeoAxis.Networking
 									if( trace )
 										Log.Info( $"Send Text Checksum {connection.DataMessagesSentCounter} {connection.dataMessagesSentChecksum}" );
 
-									connection.Send2( text );
+									var buffer = Encoding.UTF8.GetBytes( text );
+									await webSocket.SendAsync( new ArraySegment<byte>( buffer ), WebSocketMessageType.Text, true, CancellationToken.None );
 								}
 								catch( Exception e )
 								{
-									connection.Close2( CloseStatusCode.ProtocolError, "Unable to send the checksum command message. " + e.Message );
+									await client.CloseAsync( message.CloseStatusCode, "Unable to send the checksum command message. " + e.Message );
 									break;
 								}
 							}
@@ -1140,17 +1218,20 @@ namespace NeoAxis.Networking
 						{
 							try
 							{
-								var reasonClamped = message.CloseReason;
-								if( reasonClamped.Length > 110 )
-									reasonClamped = message.CloseReason.Substring( 0, 110 ) + "...";
-
-								connection.Close2( message.CloseStatusCode, reasonClamped );
+								await client.CloseAsync( message.CloseStatusCode, message.CloseReason );
 							}
 							catch { }
 						}
 
 						if( Disposed || threadNeedExit )
 							break;
+					}
+
+					//normal closing with delay
+					if( client.mustNormalDisconnectTime.HasValue && DateTime.UtcNow > client.mustNormalDisconnectTime.Value )
+					{
+						client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = WebSocketCloseStatus.NormalClosure, CloseReason = string.Empty } );
+						client.mustNormalDisconnectTime = null;
 					}
 
 					if( Disposed || threadNeedExit )
@@ -1162,43 +1243,54 @@ namespace NeoAxis.Networking
 				{
 					var client = pair.Item1;
 					var rejectReason = pair.Item2;
-
 					try
 					{
-						client.Connection.Close2( CloseStatusCode.InvalidData, rejectReason );
+						//set another status?
+						await client.CloseAsync( WebSocketCloseStatus.ProtocolError, rejectReason );
 					}
 					catch { }
 				}
 
 				Thread.Sleep( 1 );
+				//threadNeedUpdate.WaitOne();
 			}
 		}
 
-		public virtual void Dispose()// string reason )
+		public virtual void Dispose()
 		{
 			//exit from the thread
-			if( thread != null )
+			var thread2 = thread;
+			if( thread2 != null )
 			{
 				threadNeedExit = true;
-				//!!!!how to make without pause?
-				Thread.Sleep( 50 );
+				//threadNeedUpdate.Set();
+
+				for( var counter = 0; thread2.ThreadState != ThreadState.Stopped && counter < 500; counter++ )
+					Thread.Sleep( 1 );
+				//for( var counter = 0; thread2.ThreadState != ThreadState.Stopped && counter < 50; counter++ )
+				//	Thread.Sleep( 1 );
+				//Thread.Sleep( 50 );
+
 				thread = null;
 			}
 
-			//dispose connected nodes
+			//remove connected clients
 			lock( clients )
 			{
 				while( clients.Count != 0 )
 				{
 					foreach( var node in GetClientsArray() )
-						RemoveClient( node );
+						RemoveClient( node, false );
 				}
 			}
 
 			if( server != null )
 			{
-				server.Stop();
-				//server.Shutdown( reason );
+				try
+				{
+					server.Stop();
+				}
+				catch { }
 
 				server = null;
 			}
@@ -1207,12 +1299,6 @@ namespace NeoAxis.Networking
 			foreach( var service in services.ToArray().Reverse() )
 				service.PerformDispose();
 			//services.Clear();
-			////while( services.Count != 0 )
-			////{
-			////	var service = services[ services.Count - 1 ];
-			////	service.PerformDispose();
-			////	services.Remove( service );
-			////}
 
 			lock( instances )
 				instances.Remove( this );
@@ -1263,19 +1349,6 @@ namespace NeoAxis.Networking
 			{
 				while( client.receivedMessages.TryDequeue( out var message ) )
 				{
-					//if( message.DataString != null )
-					//{
-					//	//system string message
-
-					//	//try
-					//	//{
-					//	//}
-					//	//catch( Exception ex )
-					//	//{
-					//	//}
-
-					//}
-					//else 
 					if( message.DataBinary != null )
 					{
 						//data binary message
@@ -1293,7 +1366,7 @@ namespace NeoAxis.Networking
 							{
 								var reason = "OnMessage: Read overflow.";
 								OnReceiveProtocolErrorInternal( client, reason );
-								client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = CloseStatusCode.ProtocolError, CloseReason = reason } );
+								client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = WebSocketCloseStatus.ProtocolError, CloseReason = reason } );
 
 								break;
 							}
@@ -1310,11 +1383,11 @@ namespace NeoAxis.Networking
 							OnClientStatusChanged( client, message.CloseReason );
 						}
 
-						if( message.CloseCode == CloseStatusCode.ProtocolError )
+						if( message.CloseCode == WebSocketCloseStatus.ProtocolError )
 							OnReceiveProtocolErrorInternal( client, message.CloseReason );
 
 						//now disconnected
-						RemoveClient( client );
+						RemoveClient( client, true );
 					}
 					else if( message.ErrorMessage != null )
 					{
@@ -1332,7 +1405,7 @@ namespace NeoAxis.Networking
 						}
 
 						//now disconnected
-						RemoveClient( client );
+						RemoveClient( client, true );
 					}
 				}
 			}
@@ -1346,13 +1419,7 @@ namespace NeoAxis.Networking
 			{
 				//!!!!parallel? where else
 
-				if( client.accumulatedMessagesToSend.Length > 0 )
-				{
-					var array = client.accumulatedMessagesToSend.ToArray();
-					client.toProcessMessages.Enqueue( new Client.ToProcessMessage { DataBinary = true, DataBinaryArray = array } );
-
-					client.accumulatedMessagesToSend.Reset();
-				}
+				client.ProcessAccumulatedMessagesToSend();
 			}
 
 			DropByMaxLifetime();
@@ -1383,19 +1450,28 @@ namespace NeoAxis.Networking
 				ClientStatusChanged?.Invoke( this, client, message );
 		}
 
-		public void DisconnectClient( Client client, string reason )
+		public void DisconnectClient( Client client, string reason = null )
 		{
+			client.ProcessAccumulatedMessagesToSend();
 
-			//!!!!CloseStatusCode.Normal close?
-
-			client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = CloseStatusCode.InvalidData, CloseReason = reason ?? "" } );
+			if( string.IsNullOrEmpty( reason ) )
+			{
+				client.mustNormalDisconnectTime = DateTime.UtcNow + new TimeSpan( 0, 0, 2 );
+			}
+			else
+			{
+				client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = string.IsNullOrEmpty( reason ) ? WebSocketCloseStatus.NormalClosure : WebSocketCloseStatus.ProtocolError/*InvalidData*/, CloseReason = reason ?? string.Empty } );
+			}
 		}
 
-		void RemoveClient( Client client )
+		void RemoveClient( Client client, bool destroy )
 		{
 			lock( clients )
 				clients.Remove( client );
 			clientsArray = null;
+
+			if( destroy )
+				client.Destroy();
 		}
 
 		public IList<ServerService> Services
@@ -1451,6 +1527,18 @@ namespace NeoAxis.Networking
 			return null;
 		}
 
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public virtual T GetService<T>() where T : ServerService
+		{
+			for( int n = 0; n < services.Count; n++ )
+			{
+				var service = services[ n ];
+				if( typeof( T ).IsAssignableFrom( service.GetType() ) )
+					return (T)service;
+			}
+			return null;
+		}
+
 		//protected virtual void OnReceiveProtocolError( ConnectedNode sender, string message ) { }
 
 		internal void OnReceiveProtocolErrorInternal( Client client, string message )
@@ -1485,10 +1573,16 @@ namespace NeoAxis.Networking
 			set { defaultMaxLifetime = value; }
 		}
 
-		public int ReceiveDataMaxMessageSize
+		public int SendMessageMaxSize
 		{
-			get { return receiveDataMaxMessageSize; }
-			set { receiveDataMaxMessageSize = value; }
+			get { return sendMessageMaxSize; }
+			set { sendMessageMaxSize = value; }
+		}
+
+		public int ReceiveMessageMaxSize
+		{
+			get { return receiveMessageMaxSize; }
+			set { receiveMessageMaxSize = value; }
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
@@ -1514,7 +1608,6 @@ namespace NeoAxis.Networking
 			if( server != null )
 			{
 				var now = DateTime.UtcNow;
-
 				if( ( now - dropByMaxLifetimeLastTime ).TotalSeconds > 1 )
 				{
 					dropByMaxLifetimeLastTime = now;
@@ -1523,7 +1616,7 @@ namespace NeoAxis.Networking
 					{
 						if( client.MaxLifetime > 0 && ( now - client.CreationTime ).TotalSeconds > client.MaxLifetime )
 						{
-							client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = CloseStatusCode.Away, CloseReason = "Max lifetime." } );
+							client.toProcessMessages.Enqueue( new Client.ToProcessMessage { Close = true, CloseStatusCode = WebSocketCloseStatus.EndpointUnavailable, CloseReason = "Max lifetime." } );
 						}
 					}
 				}
@@ -1535,9 +1628,8 @@ namespace NeoAxis.Networking
 		{
 			var reader = new ArrayDataReader( data, position, length );
 
-			var pair = reader.ReadByte();
-			var serviceIdentifier = (byte)( pair >> 4 );
-			var messageIdentifier = (byte)( pair & 15 );
+			var serviceIdentifier = reader.ReadByte();
+			var messageIdentifier = reader.ReadByte();
 
 			if( reader.Overflow )
 			{
@@ -1654,6 +1746,7 @@ namespace NeoAxis.Networking
 
 
 		}
+
 	}
 }
 #endif

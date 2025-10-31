@@ -104,7 +104,7 @@ namespace Project
 			var list = GetListServers();
 			if( list != null )
 			{
-				list.Items.Add( "" );// "Not selected" );
+				list.AddItem( "" );// "Not selected" );
 				predefinedServers.Add( ("", "") );
 
 				//get prefined list from NeoAxis.DefaultSettings.config
@@ -118,9 +118,9 @@ namespace Project
 						if( !string.IsNullOrEmpty( address ) )
 						{
 							if( address.Contains( ":" ) )
-								list.Items.Add( "[" + address + "]:" + port );
+								list.AddItem( "[" + address + "]:" + port );
 							else
-								list.Items.Add( address + ":" + port );
+								list.AddItem( address + ":" + port );
 
 							predefinedServers.Add( (address, port) );
 						}

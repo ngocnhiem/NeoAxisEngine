@@ -196,11 +196,11 @@ namespace NeoAxis
 			//do clicking
 			if( NetworkIsClient )
 			{
-				var writer = BeginNetworkMessageToServer( "Click" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "Click" );
+				if( m != null )
 				{
-					writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
-					EndNetworkMessage();
+					m.Writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
+					m.End();
 				}
 			}
 			else

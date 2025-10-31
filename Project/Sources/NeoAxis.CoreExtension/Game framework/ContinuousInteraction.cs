@@ -88,11 +88,11 @@ namespace NeoAxis
 		{
 			if( NetworkIsClient )
 			{
-				var writer = BeginNetworkMessageToServer( "MessageFromParticipant" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "MessageFromParticipant" );
+				if( m != null )
 				{
-					writer.Write( message );
-					EndNetworkMessage();
+					m.Writer.Write( message );
+					m.End();
 				}
 			}
 			else
@@ -126,7 +126,7 @@ namespace NeoAxis
 
 			if( message == "MessageFromParticipant" )
 			{
-				var messageText = reader.ReadString();
+				var messageText = reader.ReadString() ?? string.Empty;
 				if( !reader.Complete() )
 					return false;
 

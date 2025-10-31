@@ -1755,12 +1755,12 @@ namespace NeoAxis.Editor
 								fileItem.PerformChildrenChanged();
 						}
 
-						//Launcher specific
-						{
-							var fileItem = item as LauncherEditRepositoryContentBrowserItem;
-							if( fileItem != null && fileItem.IsDirectory )
-								fileItem.PerformChildrenChanged();
-						}
+						////Launcher specific
+						//{
+						//	var fileItem = item as LauncherEditRepositoryContentBrowserItem;
+						//	if( fileItem != null && fileItem.IsDirectory )
+						//		fileItem.PerformChildrenChanged();
+						//}
 					}
 				}
 			}

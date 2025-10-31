@@ -45,7 +45,7 @@
 			VerticalAlignment = Bottom
 			Margin = Units 10 720 0 60
 			EditorScrollPosition = 0 0
-			Items
+			ItemsAsText
 			{
 				Count = 4
 				0 = 1

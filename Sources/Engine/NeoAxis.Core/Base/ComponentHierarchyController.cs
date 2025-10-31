@@ -1,4 +1,5 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
+using NeoAxis.Networking;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -76,23 +77,33 @@ namespace NeoAxis
 				SimulationStep?.Invoke( this );
 			}
 
-			public delegate void BeginNetworkMessageDelegate( NetworkServerInterface sender, Component component, IList<ServerNetworkService_Components.ClientItem> clientRecipients, ServerNetworkService_Components.ClientItem clientRecipient, IList<ServerNetworkService_Users.UserInfo> userRecipients, ServerNetworkService_Users.UserInfo userRecipient, bool toEveryone, string message, ref ArrayDataWriter writer );
+			public delegate void BeginNetworkMessageDelegate( NetworkServerInterface sender, Component component, IList<ServerNetworkService_Components.ClientItem> clientRecipients, ServerNetworkService_Components.ClientItem clientRecipient, IList<ServerNetworkService_Users.UserInfo> userRecipients, ServerNetworkService_Users.UserInfo userRecipient, bool toEveryone, string message, ref ServerService.BeginMessageContext messageContext );
 			public event BeginNetworkMessageDelegate BeginNetworkMessage;
 			[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-			public ArrayDataWriter PerformBeginNetworkMessage( Component component, IList<ServerNetworkService_Components.ClientItem> clientRecipients, ServerNetworkService_Components.ClientItem clientRecipient, IList<ServerNetworkService_Users.UserInfo> userRecipients, ServerNetworkService_Users.UserInfo userRecipient, bool toEveryone, string message )
+			public ServerService.BeginMessageContext PerformBeginNetworkMessage( Component component, IList<ServerNetworkService_Components.ClientItem> clientRecipients, ServerNetworkService_Components.ClientItem clientRecipient, IList<ServerNetworkService_Users.UserInfo> userRecipients, ServerNetworkService_Users.UserInfo userRecipient, bool toEveryone, string message )
 			{
-				ArrayDataWriter writer = null;
-				BeginNetworkMessage?.Invoke( this, component, clientRecipients, clientRecipient, userRecipients, userRecipient, toEveryone, message, ref writer );
-				return writer;
+				ServerService.BeginMessageContext messageContext = null;
+				BeginNetworkMessage?.Invoke( this, component, clientRecipients, clientRecipient, userRecipients, userRecipient, toEveryone, message, ref messageContext );
+				return messageContext;
 			}
 
-			public delegate void EndNetworkMessageDelegate( NetworkServerInterface sender );
-			public event EndNetworkMessageDelegate EndNetworkMessage;
-			[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-			public void PerformEndNetworkMessage()
-			{
-				EndNetworkMessage?.Invoke( this );
-			}
+			//public delegate void BeginNetworkMessageDelegate( NetworkServerInterface sender, Component component, IList<ServerNetworkService_Components.ClientItem> clientRecipients, ServerNetworkService_Components.ClientItem clientRecipient, IList<ServerNetworkService_Users.UserInfo> userRecipients, ServerNetworkService_Users.UserInfo userRecipient, bool toEveryone, string message, ref ArrayDataWriter writer );
+			//public event BeginNetworkMessageDelegate BeginNetworkMessage;
+			//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+			//public ArrayDataWriter PerformBeginNetworkMessage( Component component, IList<ServerNetworkService_Components.ClientItem> clientRecipients, ServerNetworkService_Components.ClientItem clientRecipient, IList<ServerNetworkService_Users.UserInfo> userRecipients, ServerNetworkService_Users.UserInfo userRecipient, bool toEveryone, string message )
+			//{
+			//	ArrayDataWriter writer = null;
+			//	BeginNetworkMessage?.Invoke( this, component, clientRecipients, clientRecipient, userRecipients, userRecipient, toEveryone, message, ref writer );
+			//	return writer;
+			//}
+
+			//public delegate void EndNetworkMessageDelegate( NetworkServerInterface sender );
+			//public event EndNetworkMessageDelegate EndNetworkMessage;
+			//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+			//public void PerformEndNetworkMessage()
+			//{
+			//	EndNetworkMessage?.Invoke( this );
+			//}
 
 			public delegate void GetComponentByNetworkIDDelegate( NetworkServerInterface sender, long networkID, ref Component component );
 			public event GetComponentByNetworkIDDelegate GetComponentByNetworkID;
@@ -133,23 +144,33 @@ namespace NeoAxis
 
 		public class NetworkClientInterface
 		{
-			public delegate void BeginNetworkMessageDelegate( NetworkClientInterface sender, Component component, string message, ref ArrayDataWriter writer );
+			public delegate void BeginNetworkMessageDelegate( NetworkClientInterface sender, Component component, string message, ref ClientService.BeginMessageContext messageContext );
 			public event BeginNetworkMessageDelegate BeginNetworkMessage;
 			[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-			public ArrayDataWriter PerformBeginNetworkMessage( Component component, string message )
+			public ClientService.BeginMessageContext PerformBeginNetworkMessage( Component component, string message )
 			{
-				ArrayDataWriter writer = null;
-				BeginNetworkMessage?.Invoke( this, component, message, ref writer );
-				return writer;
+				ClientService.BeginMessageContext messageContext = null;
+				BeginNetworkMessage?.Invoke( this, component, message, ref messageContext );
+				return messageContext;
 			}
 
-			public delegate void EndNetworkMessageDelegate( NetworkClientInterface sender );
-			public event EndNetworkMessageDelegate EndNetworkMessage;
-			[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-			public void PerformEndNetworkMessage()
-			{
-				EndNetworkMessage?.Invoke( this );
-			}
+			//public delegate void BeginNetworkMessageDelegate( NetworkClientInterface sender, Component component, string message, ref ArrayDataWriter writer );
+			//public event BeginNetworkMessageDelegate BeginNetworkMessage;
+			//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+			//public ArrayDataWriter PerformBeginNetworkMessage( Component component, string message )
+			//{
+			//	ArrayDataWriter writer = null;
+			//	BeginNetworkMessage?.Invoke( this, component, message, ref writer );
+			//	return writer;
+			//}
+
+			//public delegate void EndNetworkMessageDelegate( NetworkClientInterface sender );
+			//public event EndNetworkMessageDelegate EndNetworkMessage;
+			//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+			//public void PerformEndNetworkMessage()
+			//{
+			//	EndNetworkMessage?.Invoke( this );
+			//}
 
 			public delegate void GetComponentByNetworkIDDelegate( NetworkClientInterface sender, long networkID, ref Component component );
 			public event GetComponentByNetworkIDDelegate GetComponentByNetworkID;
@@ -358,7 +379,7 @@ namespace NeoAxis
 		{
 			if( !component.networkSubscribedToEvents )
 			{
-				var context = NetworkUtility.metadataGetMembersContextNoFilter;//new Metadata.GetMembersContext( false );
+				var context = NetworkUtilityInternal.metadataGetMembersContextNoFilter;//new Metadata.GetMembersContext( false );
 
 				foreach( var member in component.MetadataGetMembers( context ).ToArray() )
 				{
@@ -405,7 +426,7 @@ namespace NeoAxis
 		{
 			if( component.networkSubscribedToEvents )
 			{
-				var context = NetworkUtility.metadataGetMembersContextNoFilter;//new Metadata.GetMembersContext( false );
+				var context = NetworkUtilityInternal.metadataGetMembersContextNoFilter;//new Metadata.GetMembersContext( false );
 
 				foreach( var member in component.MetadataGetMembers( context ).ToArray() )
 				{

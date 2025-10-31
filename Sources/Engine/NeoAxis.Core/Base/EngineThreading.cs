@@ -375,9 +375,11 @@ namespace NeoAxis
 
 		static void WaitItemExecution( QueuedActionItem item )
 		{
-			//!!!!!так?
 			while( !item.executed )
+			{
+				//!!!!good? //? Thread.Yield();
 				Thread.Sleep( 0 );
+			}
 		}
 
 		public static void ExecuteFromMainThreadWait<T1, T2, T3, T4>( Action<T1, T2, T3, T4> action, T1 param1, T2 param2, T3 param3, T4 param4 )

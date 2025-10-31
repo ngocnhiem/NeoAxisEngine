@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace NeoAxis.Networking
 {
@@ -18,6 +19,8 @@ namespace NeoAxis.Networking
 		static Thread autoUpdateInstancesThread;
 		//static bool autoUpdateInstancesThreadNeedExit;
 
+		bool autoUpdate;
+
 		string serviceName;
 
 		ConnectionSettingsClass connectionSettings;
@@ -30,14 +33,21 @@ namespace NeoAxis.Networking
 
 		public class ConnectionSettingsClass
 		{
+			//initial settings
+			public BasicServiceClient PreCreatedInstance;
+			public bool AutoUpdate = true;
 			public ConnectionTypeEnum ConnectionType;
+			public CloudUserRole UserRole; //Developer, Player
+
+			//both Direct and Cloud specific
+			public int ServerPort;
 
 			//Direct specific
 			public string ServerAddress;
-			public int ServerPort;
+			//public int ServerPort;
 			public string Password;
 
-			//Cloudbox specific
+			//Cloud specific
 			public long ProjectID;
 
 			//public string AnyData;
@@ -54,7 +64,7 @@ namespace NeoAxis.Networking
 				/// <summary>
 				/// Connecting with login of current user in the launcher.
 				/// </summary>
-				Cloudbox,
+				Cloud,
 			}
 
 			/////////////////////
@@ -63,20 +73,22 @@ namespace NeoAxis.Networking
 			{
 			}
 
-			public static ConnectionSettingsClass CreateDirect( string serverAddress, int serverPort, string password )
+			public static ConnectionSettingsClass CreateDirect( CloudUserRole userRole, string serverAddress, int serverPort, string password )
 			{
 				var result = new ConnectionSettingsClass();
 				result.ConnectionType = ConnectionTypeEnum.Direct;
+				result.UserRole = userRole;
 				result.ServerAddress = serverAddress;
 				result.ServerPort = serverPort;
 				result.Password = password;
 				return result;
 			}
 
-			public static ConnectionSettingsClass CreateCloudbox( long projectID = 0 )
+			public static ConnectionSettingsClass CreateCloud( CloudUserRole userRole, long projectID = 0 )
 			{
 				var result = new ConnectionSettingsClass();
-				result.ConnectionType = ConnectionTypeEnum.Cloudbox;
+				result.ConnectionType = ConnectionTypeEnum.Cloud;
+				result.UserRole = userRole;
 				result.ProjectID = projectID;
 				return result;
 			}
@@ -143,26 +155,34 @@ namespace NeoAxis.Networking
 		//	return new CreateResult() { Client = instance };
 		//}
 
-		protected BasicServiceClient( bool autoUpdate )
+		protected BasicServiceClient()
 		{
-			if( autoUpdate )
-			{
-				autoUpdateInstances.Add( this );
-
-				if( autoUpdateInstancesThread == null )
-				{
-					autoUpdateInstancesThread = new Thread( AutoUpdateInstancesThreadFunction );
-					autoUpdateInstancesThread.IsBackground = true;
-					autoUpdateInstancesThread.Start();
-				}
-			}
 		}
+
+		//protected BasicServiceClient( bool autoUpdate )
+		//{
+		//	this.autoUpdate = autoUpdate;
+
+		//	if( autoUpdate )
+		//	{
+		//		autoUpdateInstances.Add( this );
+
+		//		if( autoUpdateInstancesThread == null )
+		//		{
+		//			autoUpdateInstancesThread = new Thread( AutoUpdateInstancesThreadFunction );
+		//			autoUpdateInstancesThread.IsBackground = true;
+		//			autoUpdateInstancesThread.Start();
+		//		}
+		//	}
+		//}
 
 		static void AutoUpdateInstancesThreadFunction( object param )
 		{
+			//maybe change to exit from thread when no instances
 
-			//!!!!
-			while( true )// !Disposed && !threadNeedExit )
+			//use wait/trigger instead of Thread.Sleep
+
+			while( true )
 			{
 				if( autoUpdateInstances.Count > 0 )
 				{
@@ -173,6 +193,11 @@ namespace NeoAxis.Networking
 				else
 					Thread.Sleep( 10 );
 			}
+		}
+
+		public bool AutoUpdate
+		{
+			get { return autoUpdate; }
 		}
 
 		public string ServiceName
@@ -201,6 +226,8 @@ namespace NeoAxis.Networking
 		{
 			get { return connectionErrorReceived; }
 		}
+
+		public object AnyData { get; set; }
 
 		protected abstract BasicServiceNode OnCreateNetworkNode();
 
@@ -244,9 +271,6 @@ namespace NeoAxis.Networking
 		//		instance.Destroy();
 		//}
 
-		//!!!!about reconnect
-		//!!!!проверять когда было последнее сообщение. еще много где может быть проблема с накапливанием неотправленных сообщений
-
 		//public bool Connected
 		//{
 		//	get
@@ -255,34 +279,62 @@ namespace NeoAxis.Networking
 		//	}
 		//}
 
+		public delegate void BeforeConnectDelegate( BasicServiceClient sender, BasicServiceNode node, TextBlock loginData );
+		public event BeforeConnectDelegate BeforeConnect;
+
+		protected virtual void OnBeforeConnect( BasicServiceNode node, TextBlock loginData ) { }
+
 		/// <summary>
 		/// Returns error.
 		/// </summary>
 		/// <returns></returns>
-		public async Task<string> ReconnectAsync()
+		public async Task<string> ReconnectAsync( CancellationToken cancellationToken = default )
 		{
 			try
 			{
 				connectionNode?.Dispose();
 				connectionNode = null;
 
+
+				if( connectionSettings.AutoUpdate )
+				{
+					if( !autoUpdateInstances.Contains( this ) )
+					{
+						autoUpdateInstances.Add( this );
+
+						if( autoUpdateInstancesThread == null )
+						{
+							autoUpdateInstancesThread = new Thread( AutoUpdateInstancesThreadFunction );
+							autoUpdateInstancesThread.IsBackground = true;
+							autoUpdateInstancesThread.Start();
+						}
+					}
+				}
+
 				string serverAddress;
 				int serverPort;
 				string password = null;
 				string verificationCode = null;
 
-				if( connectionSettings.ConnectionType == ConnectionSettingsClass.ConnectionTypeEnum.Cloudbox )
+				if( connectionSettings.ConnectionType == ConnectionSettingsClass.ConnectionTypeEnum.Cloud )
 				{
 					if( string.IsNullOrEmpty( ServiceName ) )
 						return "ServiceName is not configured.";
 
-					//request access info from Cloudbox. get access data from general manager
-					var requestCodeResult = await GeneralManagerFunctions.RequestServiceAsync( ServiceName, connectionSettings.ProjectID );
+					var projectID = connectionSettings.ProjectID;
+					//get projectID from command line parameters or assembly file path
+					if( projectID == 0 )
+						projectID = CloudClientProcessUtility.ProjectID;
+					if( projectID == 0 )
+						return "ProjectID is not configured.";
+
+					//request access info from cloud. get access data from general manager
+					var requestCodeResult = await GeneralManagerFunctions.AccessRequestServiceServerAsync( ServiceName, connectionSettings.UserRole, projectID, cancellationToken );
 					if( !string.IsNullOrEmpty( requestCodeResult.Error ) )
 						return "RequestService failed. " + requestCodeResult.Error;
 
 					serverAddress = requestCodeResult.ServerAddress;
-					serverPort = requestCodeResult.ServerPort;
+					serverPort = connectionSettings.ServerPort != 0 ? connectionSettings.ServerPort : requestCodeResult.ServerPort;
 					verificationCode = requestCodeResult.VerificationCode;
 				}
 				else
@@ -299,13 +351,16 @@ namespace NeoAxis.Networking
 				node.Messages.ReceiveMessageString += Messages_ReceiveMessageString;
 				node.Messages.ReceiveMessageBinary += Messages_ReceiveMessageBinary;
 
-				var rootBlock = new TextBlock();
+				var loginData = new TextBlock();
+				loginData.SetAttribute( "UserRole", connectionSettings.UserRole.ToString() );
 				if( !string.IsNullOrEmpty( verificationCode ) )
-					rootBlock.SetAttribute( "VerificationCode", verificationCode );
+					loginData.SetAttribute( "VerificationCode", verificationCode );
 				if( !string.IsNullOrEmpty( password ) )
-					rootBlock.SetAttribute( "Password", password );
+					loginData.SetAttribute( "Password", password );
+				OnBeforeConnect( node, loginData );
+				BeforeConnect?.Invoke( this, node, loginData );
 
-				if( !node.BeginConnect( serverAddress, serverPort, EngineInfo.Version, rootBlock.DumpToString(), 30, out var error ) )
+				if( !node.BeginConnect( serverAddress, serverPort, EngineInfo.Version, loginData.DumpToString(), 30, out var error ) )
 				{
 					node.Dispose();
 					node = null;
@@ -320,6 +375,8 @@ namespace NeoAxis.Networking
 					{
 						Update();
 						await Task.Delay( 1 );
+						if( cancellationToken.IsCancellationRequested )
+							break;
 					}
 					if( ConnectionNode.Status != NetworkStatus.Connected || !Verified )
 						return connectionErrorReceived ?? "ConnectionNode.Status != NetworkStatus.Connected || !Verified";
@@ -339,7 +396,7 @@ namespace NeoAxis.Networking
 
 		private void Client_ProtocolError( ClientNode sender, string message )
 		{
-			//!!!!? reconnect, resend requests
+			//? reconnect, resend requests
 
 			connectionErrorReceived = "Protocol error: " + message;
 
@@ -356,7 +413,7 @@ namespace NeoAxis.Networking
 		{
 			if( sender.Status == NetworkStatus.Disconnected )
 			{
-				//!!!!? reconnect, resend requests
+				//? reconnect, resend requests
 
 				if( !string.IsNullOrEmpty( sender.DisconnectionReason ) )
 				{

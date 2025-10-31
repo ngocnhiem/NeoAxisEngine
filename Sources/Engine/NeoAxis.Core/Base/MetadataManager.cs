@@ -1914,7 +1914,6 @@ namespace NeoAxis
 					}
 					t = t.BaseType;
 
-					//!!!!new
 					if( t != null && t.IsGenericType )
 						t = t.GetGenericTypeDefinition();
 

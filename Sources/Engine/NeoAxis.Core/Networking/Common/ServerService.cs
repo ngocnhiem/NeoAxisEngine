@@ -3,12 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace NeoAxis.Networking
 {
 	public abstract class ServerService
 	{
-		internal const int maxMessageTypeIdentifier = 15;
+		internal const int maxMessageTypeIdentifier = 255;
 
 		//general
 		internal ServerNode owner;
@@ -19,11 +20,8 @@ namespace NeoAxis.Networking
 		Dictionary<string, MessageType> messageTypesByName = new Dictionary<string, MessageType>();
 		List<MessageType> messageTypesByID = new List<MessageType>();
 
-		//send data
-		bool sendingData;
-		int sendingMessageID;
-		List<ServerNode.Client> sendingDestinationClients = new List<ServerNode.Client>();
-		ArrayDataWriter sendDataWriter = new ArrayDataWriter();
+		//optimization
+		BeginMessageContext oneBeginMessage = new BeginMessageContext();
 
 		///////////////////////////////////////////
 
@@ -83,11 +81,6 @@ namespace NeoAxis.Networking
 		public int Identifier
 		{
 			get { return identifier; }
-		}
-
-		public bool SendingData
-		{
-			get { return sendingData; }
 		}
 
 		protected virtual void OnDispose()
@@ -163,6 +156,9 @@ namespace NeoAxis.Networking
 				var messageTypeItem = serviceItem.GetMessageTypeItem( messageType.Identifier );
 				messageTypeItem.ReceivedMessages++;
 				messageTypeItem.ReceivedSize += lengthForProfiler;
+
+				profiledDataCached.TotalReceivedMessages++;
+				profiledDataCached.TotalReceivedSize += lengthForProfiler;
 			}
 
 			if( messageType.ReceiveHandler == null )
@@ -184,176 +180,168 @@ namespace NeoAxis.Networking
 
 		protected internal virtual void OnUpdate() { }
 
-		[MethodImpl( (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( IList<ServerNode.Client> recipients, int messageID )
+		///////////////////////////////////////////////
+
+		public class BeginMessageContext
 		{
-			if( sendingData )
-				Log.Fatal( "ServerService: BeginMessage: The message is already begun." );
-			if( recipients == null )
-				Log.Fatal( "ServerService: BeginMessage: recipients = null." );
-			if( messageID <= 0 || messageID > 15 )
-				Log.Fatal( "ServerService: BeginMessage: messageID <= 0 || messageID > 15." );
+			public ServerService Owner;
+			public int MessageID;
+			public List<ServerNode.Client> Recepients = new List<ServerNode.Client>();
+			public ArrayDataWriter Writer = new ArrayDataWriter( 128 );
 
-			sendingData = true;
-			sendingMessageID = messageID;
-			for( int n = 0; n < recipients.Count; n++ )
-				sendingDestinationClients.Add( recipients[ n ] );
-			sendDataWriter.Reset();
+			/////////////////////
 
-			sendDataWriter.Write( (byte)( ( Identifier << 4 ) + messageID ) );
+			[MethodImpl( (MethodImplOptions)512 )]
+			public void End()
+			{
+				var server = Owner.Owner?.server;
+				if( server != null )
+				{
+					for( int n = 0; n < Recepients.Count; n++ )
+					{
+						var client = Recepients[ n ];
+						if( client.Status == NetworkStatus.Connected )
+						{
+							var writer = Writer;
 
-			return sendDataWriter;
+							int bytesWritten = client.AddAccumulatedMessageToSend( writer );
+							//int bytesWritten;
+							//lock( client.accumulatedMessagesToSend )
+							//{
+							//	bytesWritten = client.accumulatedMessagesToSend.WriteVariableUInt32( (uint)writer.Length );
+							//	client.accumulatedMessagesToSend.Write( writer.Data, 0, writer.Length );
+							//}
+
+							var profilerDataCached = Owner.Owner.ProfilerData;
+							if( profilerDataCached != null )
+							{
+								var serviceItem = profilerDataCached.GetServiceItem( Owner.Identifier );
+								var messageTypeItem = serviceItem.GetMessageTypeItem( MessageID );
+
+								Interlocked.Increment( ref messageTypeItem.SentMessages );
+								Interlocked.Add( ref messageTypeItem.SentSize, writer.Length );
+
+								Interlocked.Increment( ref profilerDataCached.TotalSentMessages );
+								Interlocked.Add( ref profilerDataCached.TotalSentSize, bytesWritten + writer.Length );
+							}
+						}
+					}
+				}
+
+				var current = Owner.oneBeginMessage;
+				if( current == null || Writer.Data.Length > current.Writer.Data.Length )
+					Interlocked.CompareExchange( ref Owner.oneBeginMessage, this, current );
+			}
+		}
+
+		///////////////////////////////////////////////
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public BeginMessageContext BeginMessage( int messageID )
+		{
+			if( messageID <= 0 || messageID > maxMessageTypeIdentifier )
+				Log.Fatal( "ServerService: BeginMessage: messageID <= 0 || messageID > 255." );
+
+			var m = Interlocked.Exchange( ref oneBeginMessage, null );
+			if( m == null )
+				m = new BeginMessageContext();
+
+			m.Owner = this;
+			m.MessageID = messageID;
+			m.Recepients.Clear();
+			m.Writer.Reset();
+			m.Writer.Write( (byte)Identifier );
+			m.Writer.Write( (byte)messageID );
+
+			return m;
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( IList<ServerNode.Client> recipients, MessageType messageType )
+		public BeginMessageContext BeginMessage( MessageType messageType )
+		{
+			return BeginMessage( messageType.Identifier );
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public BeginMessageContext BeginMessage( IList<ServerNode.Client> recipients, int messageID )
+		{
+			if( recipients == null )
+				Log.Fatal( "ServerService: BeginMessage: recipients = null." );
+
+			var m = BeginMessage( messageID );
+			for( int n = 0; n < recipients.Count; n++ )
+				m.Recepients.Add( recipients[ n ] );
+			return m;
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public BeginMessageContext BeginMessage( IList<ServerNode.Client> recipients, MessageType messageType )
 		{
 			return BeginMessage( recipients, messageType.Identifier );
 		}
 
 		[MethodImpl( (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( ServerNode.Client recipient, int messageID )
+		public BeginMessageContext BeginMessage( ServerNode.Client recipient, int messageID )
 		{
-			//!!!!maybe no fatals
-			if( sendingData )
-				Log.Fatal( "ServerService: BeginMessage: The message is already begun." );
 			if( recipient == null )
 				Log.Fatal( "ServerService: BeginMessage: recipient = null." );
-			if( messageID <= 0 || messageID > 15 )
-				Log.Fatal( "ServerService: BeginMessage: messageID <= 0 || messageID > 15." );
 
-			sendingData = true;
-			sendingMessageID = messageID;
-			sendingDestinationClients.Add( recipient );
-			sendDataWriter.Reset();
-
-			sendDataWriter.Write( (byte)( ( Identifier << 4 ) + messageID ) );
-
-			return sendDataWriter;
+			var m = BeginMessage( messageID );
+			m.Recepients.Add( recipient );
+			return m;
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( ServerNode.Client recipient, MessageType messageType )
+		protected BeginMessageContext BeginMessage( ServerNode.Client recipient, MessageType messageType )
 		{
 			return BeginMessage( recipient, messageType.Identifier );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessageToEveryone( int messageID )
+		public BeginMessageContext BeginMessageToAll( int messageID )
 		{
-			//!!!!broadcast
-			//!!!!where else. broadcast scene data
+			//broadcast?
+			//where else. broadcast scene data
 
 			return BeginMessage( owner.GetClientsArray(), messageID );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessageToEveryone( MessageType messageType )
+		public BeginMessageContext BeginMessageToAll( MessageType messageType )
 		{
 			return BeginMessage( owner.GetClientsArray(), messageType );
 		}
 
-		[MethodImpl( (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( int messageID )
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void SendMessage( IList<ServerNode.Client> recipients, MessageType messageType, ArraySegment<byte> data )
 		{
-			if( sendingData )
-				Log.Fatal( "ServerService: BeginMessage: The message is already begun." );
-			//if( recipients == null )
-			//	Log.Fatal( "ServerService: BeginMessage: recipients = null." );
-			if( messageID <= 0 || messageID > 15 )
-				Log.Fatal( "ServerService: BeginMessage: messageID <= 0 || messageID > 15." );
-
-			sendingData = true;
-			sendingMessageID = messageID;
-			//for( int n = 0; n < recipients.Count; n++ )
-			//	sendingDestinationNodes.Add( recipients[ n ] );
-			sendDataWriter.Reset();
-
-			sendDataWriter.Write( (byte)( ( Identifier << 4 ) + messageID ) );
-
-			return sendDataWriter;
+			var m = BeginMessage( recipients, messageType );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( MessageType messageType )
+		public void SendMessage( IList<ServerNode.Client> recipients, int messageID, ArraySegment<byte> data )
 		{
-			return BeginMessage( messageType.Identifier );
+			var m = BeginMessage( recipients, messageID );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected void AddMessageRecipient( ServerNode.Client recipient )
+		public void SendMessage( ServerNode.Client recipient, MessageType messageType, ArraySegment<byte> data )
 		{
-			if( !sendingData )
-				Log.Fatal( "ServerService: AddMessageRecipient: The message is not begun." );
-
-			sendingDestinationClients.Add( recipient );
+			var m = BeginMessage( recipient, messageType );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
 
-		[MethodImpl( (MethodImplOptions)512 )]
-		protected void EndMessage()
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void SendMessage( ServerNode.Client recipient, int messageID, ArraySegment<byte> data )
 		{
-			if( !sendingData )
-				Log.Fatal( "ServerService: EndMessage: The message is not begun." );
-
-			var server = owner?.server;
-			if( server != null )
-			{
-				for( int n = 0; n < sendingDestinationClients.Count; n++ )
-				{
-					var client = sendingDestinationClients[ n ];
-
-					if( client.Status == NetworkStatus.Connected )
-					{
-						var writer = sendDataWriter;
-
-						var bytesWritten = client.accumulatedMessagesToSend.WriteVariableUInt32( (uint)writer.Length );
-						client.accumulatedMessagesToSend.Write( writer.Data, 0, writer.Length );
-
-						var profilerDataCached = owner.ProfilerData;
-						if( profilerDataCached != null )
-						{
-							var serviceItem = profilerDataCached.GetServiceItem( Identifier );
-							var messageTypeItem = serviceItem.GetMessageTypeItem( sendingMessageID );
-							messageTypeItem.SentMessages++;
-							messageTypeItem.SentSize += sendDataWriter.Length;
-
-							profilerDataCached.TotalSentMessages++;
-							profilerDataCached.TotalSentSize += bytesWritten + writer.Length;
-						}
-
-
-						//var writer2 = new ArrayDataWriter( 4 + writer.Length );
-						//var bytesWritten = writer2.WriteVariableUInt32( (uint)writer.Length );
-						//writer2.Write( writer.Data, 0, writer.Length );
-
-						//var segment = new ArraySegment<byte>( writer2.Data, 0, writer2.Length );
-						//client.toProcessMessages.Enqueue( new ServerNode.Client.ToProcessMessage { DataBinary = true, DataBinarySegment = segment } );
-
-						//if( owner.ProfilerData != null )
-						//{
-						//	var serviceItem = owner.ProfilerData.GetServiceItem( Identifier );
-						//	var messageTypeItem = serviceItem.GetMessageTypeItem( sendingMessageID );
-						//	messageTypeItem.SentMessages++;
-						//	messageTypeItem.SentSize += sendDataWriter.Length;
-
-						//	//owner.ProfilerData.TotalSentMessages++;
-						//	owner.ProfilerData.TotalSentSize += bytesWritten + writer.Length;
-						//}
-					}
-				}
-			}
-
-			sendingData = false;
-			sendingMessageID = -1;
-			sendingDestinationClients.Clear();
-			sendDataWriter.Reset();
+			var m = BeginMessage( recipient, messageID );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
-
-		//!!!!
-		////how to parse. need collect the data array with BeginMessage separately from usual BeginMessage
-		//public void SendMessageWithThreadingSupport( recepients, int messageID, ArrayDataWriter writer or ArraySegment[] )
-		//{
-		//}
-
 	}
 }

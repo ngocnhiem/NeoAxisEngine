@@ -575,8 +575,9 @@ namespace NeoAxis.Editor
 
 				foreach( var packageId in NeoAxisStoreImplementation.FeaturedStoreItems )
 				{
-					if( packageId == "Platform_Tools" && EngineInfo.EngineMode != EngineInfo.EngineModeEnum.Standalone )
-						continue;
+					//!!!!new commented
+					//if( packageId == "Platform_Tools" && EngineInfo.EngineMode != EngineInfo.EngineModeEnum.Standalone )
+					//	continue;
 
 					if( packagesSet.Contains( packageId ) )
 					{

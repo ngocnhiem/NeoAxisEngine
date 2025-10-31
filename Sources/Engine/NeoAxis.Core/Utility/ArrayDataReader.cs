@@ -1,9 +1,13 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
+using Internal.LiteDB;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Transactions;
 
 namespace NeoAxis
 {
@@ -179,15 +183,16 @@ namespace NeoAxis
 			return value;
 		}
 
-		//public sbyte ReadSByte()
-		//{
-		//   unchecked
-		//   {
-		//      return (sbyte)ReadByte();
-		//   }
-		//}
-
-		//public byte ReadSByte( int numberOfBits )
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public sbyte ReadSByte()
+		{
+			unsafe
+			{
+				sbyte result = 0;
+				ReadBuffer( &result, 1 );
+				return result;
+			}
+		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public short ReadInt16()
@@ -208,6 +213,11 @@ namespace NeoAxis
 			//uint value = BitWriter.ReadUInt32( data, 16, bitPosition );
 			//bitPosition = newPosition;
 			//return (short)value;
+		}
+
+		public short ReadShort()
+		{
+			return ReadInt16();
 		}
 
 		//public byte ReadInt16( int numberOfBits )
@@ -233,7 +243,21 @@ namespace NeoAxis
 			//return (ushort)value;
 		}
 
-		//public byte ReadUInt16( int numberOfBits )
+		public ushort ReadUShort()
+		{
+			return ReadUInt16();
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public char ReadChar()
+		{
+			unsafe
+			{
+				char result = (char)0;
+				ReadBuffer( &result, 2 );
+				return result;
+			}
+		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public int ReadInt32()
@@ -254,6 +278,11 @@ namespace NeoAxis
 			//uint value = BitWriter.ReadUInt32( data, 32, bitPosition );
 			//bitPosition = newPosition;
 			//return (int)value;
+		}
+
+		public int ReadInt()
+		{
+			return ReadInt32();
 		}
 
 		//public int ReadInt32( int numberOfBits )
@@ -305,6 +334,11 @@ namespace NeoAxis
 			//return value;
 		}
 
+		public uint ReadUInt()
+		{
+			return ReadUInt32();
+		}
+
 		//public UInt32 ReadUInt32( int numberOfBits )
 		//{
 		//	int newPosition = bitPosition + numberOfBits;
@@ -342,6 +376,11 @@ namespace NeoAxis
 			//}
 		}
 
+		public long ReadLong()
+		{
+			return ReadInt64();
+		}
+
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public ulong ReadUInt64()
 		{
@@ -364,6 +403,11 @@ namespace NeoAxis
 			//bitPosition += 32;
 			//ulong value = low + ( high << 32 );
 			//return value;
+		}
+
+		public ulong ReadULong()
+		{
+			return ReadUInt64();
 		}
 
 		//public ulong ReadUInt64( int numberOfBits )
@@ -434,6 +478,11 @@ namespace NeoAxis
 			//return BitConverter.ToSingle( bytes, 0 );
 		}
 
+		public float ReadFloat()
+		{
+			return ReadSingle();
+		}
+
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public double ReadDouble()
 		{
@@ -465,6 +514,17 @@ namespace NeoAxis
 			//	return 0;
 			////endianness is handled inside BitConverter.ToSingle
 			//return BitConverter.ToDouble( bytes, 0 );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public decimal ReadDecimal()
+		{
+			unsafe
+			{
+				decimal result = 0;
+				ReadBuffer( &result, sizeof( decimal ) );
+				return result;
+			}
 		}
 
 		/// <summary>
@@ -530,6 +590,11 @@ namespace NeoAxis
 			}
 		}
 
+		public int ReadVariableInt()
+		{
+			return ReadVariableInt32();
+		}
+
 		/// <summary>
 		/// Reads a UInt64 written using WriteVariableUInt64()
 		/// </summary>
@@ -559,6 +624,50 @@ namespace NeoAxis
 					return num1;
 			}
 		}
+
+		public ulong ReadVariableULong()
+		{
+			return ReadVariableUInt64();
+		}
+
+		/// <summary>
+		/// Reads a Int64 written using WriteVariableInt64()
+		/// </summary>
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public long ReadVariableInt64()
+		{
+			if( overflow )
+				return 0;
+
+			long num1 = 0;
+			int num2 = 0;
+			while( true )
+			{
+				if( num2 == 0x77 )
+				{
+					overflow = true;
+					return 0;
+				}
+
+				byte num3 = ReadByte();
+				if( overflow )
+					return 0;
+
+				num1 |= ( (long)num3 & 0x7f ) << num2;
+				num2 += 7;
+				if( ( num3 & 0x80 ) == 0 )
+				{
+					long sign = ( num1 << 63 ) >> 63;
+					return sign ^ ( num1 >> 1 );
+				}
+			}
+		}
+
+		public long ReadVariableLong()
+		{
+			return ReadVariableInt64();
+		}
+
 
 		///// <summary>
 		///// Reads a float written using WriteSignedSingle()
@@ -745,6 +854,18 @@ namespace NeoAxis
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public ColorByte ReadColorByte()
+		{
+			return new ColorByte( ReadUInt() );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public ColorValuePowered ReadColorValuePowered()
+		{
+			return new ColorValuePowered( ReadSingle(), ReadSingle(), ReadSingle(), ReadSingle(), ReadSingle() );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void ReadSphericalDirectionF( out SphericalDirectionF result )
 		{
 			result.Horizontal = ReadSingle();
@@ -844,64 +965,6 @@ namespace NeoAxis
 		[MethodImpl( (MethodImplOptions)512 )]
 		public string ReadString()
 		{
-			//int length = ReadVariableInt32();
-			//if( length == -1 )
-			//	return null;
-			//if( length == 0 )
-			//	return string.Empty;
-
-			//int newPosition = currentPosition + length;
-			//if( overflow || newPosition > endPosition )
-			//{
-			//	overflow = true;
-			//	return "";
-			//}
-			//var result = Encoding.UTF8.GetString( data, currentPosition, length );
-			//currentPosition = newPosition;
-
-			//return result;
-
-
-			int length = (int)ReadVariableUInt32();
-			if( length == 0 )
-				return "";
-
-			int newPosition = currentPosition + length;
-			if( overflow || newPosition > endPosition )
-			{
-				overflow = true;
-				return "";
-			}
-			var result = Encoding.UTF8.GetString( data, currentPosition, length );
-			currentPosition = newPosition;
-
-			return result;
-
-
-			////if( overflow || bitPosition + byteLength * 8 > endBitPosition )
-			////{
-			////	overflow = true;
-			////	return "";
-			////}
-
-			////if( ( bitPosition & 7 ) == 0 )
-			////{
-			////	//read directly
-			////	string result = System.Text.Encoding.UTF8.GetString( data, bitPosition >> 3, byteLength );
-			////	bitPosition += ( byteLength * 8 );
-			////	return result;
-			////}
-
-			////byte[] bytes = new byte[ byteLength ];
-			////ReadBuffer( bytes );
-			////if( overflow )
-			////	return "";
-			////return System.Text.Encoding.UTF8.GetString( bytes, 0, bytes.Length );
-		}
-
-		[MethodImpl( (MethodImplOptions)512 )]
-		public string ReadStringWithNullSupport()
-		{
 			int length = ReadVariableInt32();
 			if( length == -1 )
 				return null;
@@ -912,13 +975,33 @@ namespace NeoAxis
 			if( overflow || newPosition > endPosition )
 			{
 				overflow = true;
-				return "";
+				return string.Empty;
 			}
 			var result = Encoding.UTF8.GetString( data, currentPosition, length );
 			currentPosition = newPosition;
 
 			return result;
 		}
+
+		//old
+		//[MethodImpl( (MethodImplOptions)512 )]
+		//public string ReadString()
+		//{
+		//	int length = (int)ReadVariableUInt32();
+		//	if( length == 0 )
+		//		return string.Empty;
+
+		//	int newPosition = currentPosition + length;
+		//	if( overflow || newPosition > endPosition )
+		//	{
+		//		overflow = true;
+		//		return string.Empty;
+		//	}
+		//	var result = Encoding.UTF8.GetString( data, currentPosition, length );
+		//	currentPosition = newPosition;
+
+		//	return result;
+		//}
 
 		///// <summary>
 		///// Pads data with enough bits to reach a full byte. Decreases cpu usage for subsequent byte writes.
@@ -960,6 +1043,12 @@ namespace NeoAxis
 		public Range ReadRange()
 		{
 			return new Range( ReadDouble(), ReadDouble() );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public RangeI ReadRangeI()
+		{
+			return new RangeI( ReadInt(), ReadInt() );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
@@ -1064,51 +1153,460 @@ namespace NeoAxis
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public AnglesF ReadAnglesF()
+		{
+			return new AnglesF( ReadSingle(), ReadSingle(), ReadSingle() );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Angles ReadAngles()
+		{
+			return new Angles( ReadDouble(), ReadDouble(), ReadDouble() );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public DateTime ReadDateTime()
 		{
 			return new DateTime( ReadInt64() );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public unsafe Vector2H ReadVector2H()
+		public Vector2H ReadVector2H()
 		{
-			Vector2H result;
-			ReadBuffer( &result, sizeof( Vector2H ) );
-			return result;
+			unsafe
+			{
+				Vector2H result;
+				ReadBuffer( &result, sizeof( Vector2H ) );
+				return result;
+			}
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public unsafe Vector3H ReadVector3H()
+		public Vector3H ReadVector3H()
 		{
-			Vector3H result;
-			ReadBuffer( &result, sizeof( Vector3H ) );
-			return result;
+			unsafe
+			{
+				Vector3H result;
+				ReadBuffer( &result, sizeof( Vector3H ) );
+				return result;
+			}
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public unsafe Vector4H ReadVector4H()
+		public Vector4H ReadVector4H()
 		{
-			Vector4H result;
-			ReadBuffer( &result, sizeof( Vector4H ) );
-			return result;
+			unsafe
+			{
+				Vector4H result;
+				ReadBuffer( &result, sizeof( Vector4H ) );
+				return result;
+			}
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public unsafe QuaternionH ReadQuaternionH()
+		public QuaternionH ReadQuaternionH()
 		{
-			QuaternionH result;
-			ReadBuffer( &result, sizeof( QuaternionH ) );
-			return result;
+			unsafe
+			{
+				QuaternionH result;
+				ReadBuffer( &result, sizeof( QuaternionH ) );
+				return result;
+			}
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public unsafe HalfType ReadHalf()
+		public HalfType ReadHalf()
 		{
-			HalfType result;
-			ReadBuffer( &result, sizeof( HalfType ) );
-			return result;
+			unsafe
+			{
+				HalfType result;
+				ReadBuffer( &result, sizeof( HalfType ) );
+				return result;
+			}
 		}
 
-		//!!!!more types
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Matrix2F ReadMatrix2F()
+		{
+			unsafe
+			{
+				Matrix2F result;
+				ReadBuffer( &result, sizeof( Matrix2F ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Matrix2 ReadMatrix2()
+		{
+			unsafe
+			{
+				Matrix2 result;
+				ReadBuffer( &result, sizeof( Matrix2 ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Matrix3F ReadMatrix3F()
+		{
+			unsafe
+			{
+				Matrix3F result;
+				ReadBuffer( &result, sizeof( Matrix3F ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Matrix3 ReadMatrix3()
+		{
+			unsafe
+			{
+				Matrix3 result;
+				ReadBuffer( &result, sizeof( Matrix3 ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Matrix4F ReadMatrix4F()
+		{
+			unsafe
+			{
+				Matrix4F result;
+				ReadBuffer( &result, sizeof( Matrix4F ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Matrix4 ReadMatrix4()
+		{
+			unsafe
+			{
+				Matrix4 result;
+				ReadBuffer( &result, sizeof( Matrix4 ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public PlaneF ReadPlaneF()
+		{
+			unsafe
+			{
+				PlaneF result;
+				ReadBuffer( &result, sizeof( PlaneF ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Plane ReadPlane()
+		{
+			unsafe
+			{
+				Plane result;
+				ReadBuffer( &result, sizeof( Plane ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Transform ReadTransform()
+		{
+			return new Transform( ReadVector3(), ReadQuaternion(), ReadVector3() );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public SphereF ReadSphereF()
+		{
+			unsafe
+			{
+				SphereF result;
+				ReadBuffer( &result, sizeof( SphereF ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public Sphere ReadSphere()
+		{
+			unsafe
+			{
+				Sphere result;
+				ReadBuffer( &result, sizeof( Sphere ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public UIMeasureValueDouble ReadUIMeasureValueDouble()
+		{
+			unsafe
+			{
+				UIMeasureValueDouble result;
+				ReadBuffer( &result, sizeof( UIMeasureValueDouble ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public UIMeasureValueVector2 ReadUIMeasureValueVector2()
+		{
+			unsafe
+			{
+				UIMeasureValueVector2 result;
+				ReadBuffer( &result, sizeof( UIMeasureValueVector2 ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public UIMeasureValueRectangle ReadUIMeasureValueRectangle()
+		{
+			unsafe
+			{
+				UIMeasureValueRectangle result;
+				ReadBuffer( &result, sizeof( UIMeasureValueRectangle ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public RangeVector3F ReadRangeVector3F()
+		{
+			unsafe
+			{
+				RangeVector3F result;
+				ReadBuffer( &result, sizeof( RangeVector3F ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public RangeColorValue ReadRangeColorValue()
+		{
+			unsafe
+			{
+				RangeColorValue result;
+				ReadBuffer( &result, sizeof( RangeColorValue ) );
+				return result;
+			}
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public object Read( Type typeToRead )
+		{
+			//!!!!slowly
+
+			//simple types
+			var simpleType = SimpleTypes.GetTypeItem( typeToRead );
+			if( simpleType != null )
+				return simpleType.ReadFunction( this );
+
+			//array
+			if( typeToRead.IsArray )
+			{
+				//!!!!slowly
+				//arrays with simple types may be optimized. same as MetadataManager. and cache simple type item
+
+				var elementType = typeToRead.GetElementType();
+
+				var count = ReadVariableInt();
+				var value = (object)Array.CreateInstance( elementType, count );
+				var methodSetValue = value.GetType().GetMethod( "SetValue", new Type[] { typeof( object ), typeof( int ) } );
+
+				for( int n = 0; n < count; n++ )
+				{
+					var itemValue = Read( elementType );
+					methodSetValue.Invoke( value, new object[] { itemValue, n } );
+				}
+
+				return value;
+			}
+
+			//containers
+			{
+				Type containerType = typeToRead;
+				if( typeToRead.IsGenericType )
+					containerType = typeToRead.GetGenericTypeDefinition();
+
+				if( containerType == typeof( List<> ) ||
+					containerType == typeof( ESet<> ) ||
+					containerType == typeof( HashSet<> ) ||
+					containerType == typeof( SortedSet<> ) ||
+					containerType == typeof( Stack<> ) ||
+					containerType == typeof( Queue<> ) )
+				{
+					var elementType = TypeUtility.GetGenericArgumentInBaseTypes( typeToRead, containerType, 0 );
+
+					var count = ReadVariableInt();
+
+					var value = typeToRead.InvokeMember( "", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.CreateInstance | BindingFlags.Instance, null, null, new object[] { count } );
+
+					string addName;
+					if( containerType == typeof( Stack<> ) )
+						addName = "Push";
+					else if( containerType == typeof( Queue<> ) )
+						addName = "Enqueue";
+					else
+						addName = "Add";
+					var methodAdd = value.GetType().GetMethod( addName, new Type[] { elementType } );
+
+					for( int n = 0; n < count; n++ )
+					{
+						var elementObject = Read( elementType );
+						methodAdd.Invoke( value, new object[] { elementObject } );
+					}
+
+					return value;
+				}
+
+				if( containerType == typeof( Dictionary<,> ) ||
+					containerType == typeof( EDictionary<,> ) ||
+					containerType == typeof( SortedList<,> ) )
+				{
+					var elementTypes = TypeUtility.GetGenericArgumentsInBaseTypes( typeToRead, containerType );
+					var elementTypeKey = elementTypes[ 0 ];
+					var elementTypeValue = elementTypes[ 1 ];
+
+					var count = ReadVariableInt();
+
+					var value = typeToRead.InvokeMember( "", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.CreateInstance | BindingFlags.Instance, null, null, new object[] { count } );
+
+					var methodAdd = value.GetType().GetMethod( "Add", new Type[] { elementTypeKey, elementTypeValue } );
+
+					for( int n = 0; n < count; n++ )
+					{
+						var elementKey = Read( elementTypeKey );
+						var elementValue = Read( elementTypeValue );
+						methodAdd.Invoke( value, new object[] { elementKey, elementValue } );
+					}
+
+					return value;
+				}
+			}
+
+			//tuples
+			if( typeToRead.IsGenericType )
+			{
+				var genericType = typeToRead.GetGenericTypeDefinition();
+
+				if( genericType == typeof( ValueTuple<> ) ||
+					genericType == typeof( ValueTuple<,> ) ||
+					genericType == typeof( ValueTuple<,,> ) ||
+					genericType == typeof( ValueTuple<,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,,,> ) )
+				{
+					var fields = typeToRead.GetFields( BindingFlags.Public | BindingFlags.Instance );
+					if( fields != null && fields.Length > 0 )
+					{
+						var value = typeToRead.InvokeMember( "", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.CreateInstance | BindingFlags.Instance, null, null, null );
+
+						foreach( var field in fields )
+						{
+							var fieldValue = Read( field.FieldType );
+							field.SetValue( value, fieldValue );
+						}
+
+						return value;
+					}
+				}
+
+				if( genericType == typeof( Tuple<> ) ||
+					genericType == typeof( Tuple<,> ) ||
+					genericType == typeof( Tuple<,,> ) ||
+					genericType == typeof( Tuple<,,,> ) ||
+					genericType == typeof( Tuple<,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,,,> ) )
+				{
+					var properties = typeToRead.GetProperties( BindingFlags.Public | BindingFlags.Instance );
+					if( properties != null && properties.Length > 0 )
+					{
+						var constructor = typeToRead.GetConstructors().FirstOrDefault();
+						if( constructor == null )
+							throw new InvalidOperationException( "No constructor found for the Tuple type." );
+
+						var arguments = new object[ properties.Length ];
+						for( int n = 0; n < properties.Length; n++ )
+							arguments[ n ] = Read( properties[ n ].PropertyType );
+
+						var value = Activator.CreateInstance( typeToRead, arguments );
+
+						return value;
+					}
+				}
+			}
+
+			throw new NotSupportedException();
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public T Read<T>()
+		{
+			return (T)Read( typeof( T ) );
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public object ReadCustomStructure( Type typeToRead )
+		{
+			var value = typeToRead.InvokeMember( "", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.CreateInstance | BindingFlags.Instance, null, null, null );
+
+			var fields = typeToRead.GetFields( BindingFlags.Public | BindingFlags.Instance );
+			foreach( var field in fields )
+			{
+				//!!!!more checks
+
+				var fieldValue = Read( field.FieldType );
+				field.SetValue( value, fieldValue );
+			}
+
+			var properties = typeToRead.GetProperties( BindingFlags.Public | BindingFlags.Instance );
+			foreach( var property in properties )
+			{
+				//!!!!more checks
+
+				var propertyValue = Read( property.PropertyType );
+				property.SetValue( value, propertyValue );
+			}
+
+			return value;
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public T ReadCustomStructure<T>()
+		{
+			return (T)Read( typeof( T ) );
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public object[] ReadCustomStructureProperties( ArrayDataWriter.TypeToWriteCustomStructureProperty[] properties )
+		{
+			var values = new object[ properties.Length ];
+
+			for( int n = 0; n < properties.Length; n++ )
+			{
+				var p = properties[ n ];
+				if( p.FieldType != null )
+					values[ n ] = Read( p.FieldType );
+				else if( p.PropertyType != null )
+					values[ n ] = Read( p.PropertyType );
+			}
+
+			return values;
+		}
+
+		public ObjectId ReadObjectId()
+		{
+			ObjectId.TryParse( ReadString(), out var result );
+			return result;
+		}
 	}
 }

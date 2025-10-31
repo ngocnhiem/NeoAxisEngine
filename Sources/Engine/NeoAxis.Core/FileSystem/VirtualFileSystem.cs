@@ -287,7 +287,8 @@ namespace NeoAxis
 
 				InitDefaultSettingsConfig();
 
-				InitCloudProjectInfo();
+				//!!!!new commented
+				//InitCloudProjectInfo();
 
 				ArchiveManager.Init();
 				//if( !ArchiveManager.Init() )
@@ -902,26 +903,27 @@ namespace NeoAxis
 			mainThread = value;
 		}
 
-		static void InitCloudProjectInfo()
-		{
-			var fullPath = Path.Combine( Path.GetDirectoryName( Directories.Project ), "CloudProject.info" );
-			//var fullPath = Path.Combine( Directories.Project, "CloudProject.info" );
-			if( File.Exists( fullPath ) )
-			{
-				var block = TextBlockUtility.LoadFromRealFile( fullPath );
-				if( block != null )
-				{
-					if( !long.TryParse( block.GetAttribute( "ID" ), out var id ) )
-					{
-						Log.Warning( "VirtualFileSystem: InitCloudProjectInfo: Unable to parse project ID from \"CloudProject.info\"." );
-						return;
-					}
+		//!!!!new commented
+		//static void InitCloudProjectInfo()
+		//{
+		//	var fullPath = Path.Combine( Path.GetDirectoryName( Directories.Project ), "CloudProject.info" );
+		//	//var fullPath = Path.Combine( Directories.Project, "CloudProject.info" );
+		//	if( File.Exists( fullPath ) )
+		//	{
+		//		var block = TextBlockUtility.LoadFromRealFile( fullPath );
+		//		if( block != null )
+		//		{
+		//			if( !long.TryParse( block.GetAttribute( "ID" ), out var id ) )
+		//			{
+		//				Log.Warning( "VirtualFileSystem: InitCloudProjectInfo: Unable to parse project ID from \"CloudProject.info\"." );
+		//				return;
+		//			}
 
-					var name = block.GetAttribute( "Name" );
+		//			var name = block.GetAttribute( "Name" );
 
-					EngineInfo.SetEngineMode( EngineInfo.EngineModeEnum.CloudClient, new EngineInfo.CloudProjectInfoClass( id, name ) );
-				}
-			}
-		}
+		//			EngineInfo.SetEngineMode( EngineInfo.EngineModeEnum.CloudClient, new EngineInfo.CloudProjectInfoClass( id, name ) );
+		//		}
+		//	}
+		//}
 	}
 }

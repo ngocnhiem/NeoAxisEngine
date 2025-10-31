@@ -656,103 +656,103 @@ namespace NeoAxis.Editor
 			//	EditorActions.Register( a );
 			//}
 
-#if CLOUD
-			//if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-			{
-				//Cloud Project Get
-				{
-					var a = new EditorAction();
-					a.Name = "Cloud Project Get";
-					a.CommonType = EditorAction.CommonTypeEnum.General;
-					a.Description = "Gets updated files from the server. Only for cloud projects.";
-					a.ImageSmall = Properties.Resources.MoveDown_16;
-					a.ImageBig = Properties.Resources.MoveDown_32;
-					a.QatSupport = true;
-					a.RibbonText = ("Get", "");
-					a.GetState += delegate ( EditorActionGetStateContext context )
-					{
-						context.Enabled = EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient;
-					};
-					a.Click += delegate ( EditorActionClickContext context )
-					{
-						if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-							RepositoryActionsWithServer.Get( new string[] { VirtualFileSystem.Directories.Assets }, new string[ 0 ], EngineInfo.CloudProjectInfo.ID, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
-					};
-					EditorActions.Register( a );
-				}
+//#if CLOUD
+//			//if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+//			{
+//				//Cloud Project Get
+//				{
+//					var a = new EditorAction();
+//					a.Name = "Cloud Project Get";
+//					a.CommonType = EditorAction.CommonTypeEnum.General;
+//					a.Description = "Gets updated files from the server. Only for cloud projects.";
+//					a.ImageSmall = Properties.Resources.MoveDown_16;
+//					a.ImageBig = Properties.Resources.MoveDown_32;
+//					a.QatSupport = true;
+//					a.RibbonText = ("Get", "");
+//					a.GetState += delegate ( EditorActionGetStateContext context )
+//					{
+//						context.Enabled = EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient;
+//					};
+//					a.Click += delegate ( EditorActionClickContext context )
+//					{
+//						if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+//							RepositoryActionsWithServer.Get( new string[] { VirtualFileSystem.Directories.Assets }, new string[ 0 ], EngineInfo.CloudProjectInfo.ID, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
+//					};
+//					EditorActions.Register( a );
+//				}
 
-				//Cloud Project Commit
-				{
-					var a = new EditorAction();
-					a.Name = "Cloud Project Commit";
-					a.CommonType = EditorAction.CommonTypeEnum.General;
-					a.Description = "Uploads updated files to the server. Only for cloud projects.";
-					a.ImageSmall = Properties.Resources.MoveUp_16;
-					a.ImageBig = Properties.Resources.MoveUp_32;
-					a.QatSupport = true;
-					a.RibbonText = ("Commit", "");
-					a.GetState += delegate ( EditorActionGetStateContext context )
-					{
-						context.Enabled = EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient;
-					};
-					a.Click += delegate ( EditorActionClickContext context )
-					{
-						if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-							RepositoryActionsWithServer.Commit( new string[] { VirtualFileSystem.Directories.Project }, new string[ 0 ], EngineInfo.CloudProjectInfo.ID, true, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
-					};
-					EditorActions.Register( a );
-				}
+//				//Cloud Project Commit
+//				{
+//					var a = new EditorAction();
+//					a.Name = "Cloud Project Commit";
+//					a.CommonType = EditorAction.CommonTypeEnum.General;
+//					a.Description = "Uploads updated files to the server. Only for cloud projects.";
+//					a.ImageSmall = Properties.Resources.MoveUp_16;
+//					a.ImageBig = Properties.Resources.MoveUp_32;
+//					a.QatSupport = true;
+//					a.RibbonText = ("Commit", "");
+//					a.GetState += delegate ( EditorActionGetStateContext context )
+//					{
+//						context.Enabled = EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient;
+//					};
+//					a.Click += delegate ( EditorActionClickContext context )
+//					{
+//						if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+//							RepositoryActionsWithServer.Commit( new string[] { VirtualFileSystem.Directories.Project }, new string[ 0 ], EngineInfo.CloudProjectInfo.ID, true, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
+//					};
+//					EditorActions.Register( a );
+//				}
 
-				////Cloud Project Repository Settings
-				//{
-				//	var a = new EditorAction();
-				//	a.Name = "Cloud Project Repository Settings";
-				//	a.CommonType = EditorAction.CommonTypeEnum.General;
-				//	a.Description = "Opens the repository settings dialog.";
-				//	a.ImageSmall = Properties.Resources.Options_16;
-				//	a.ImageBig = Properties.Resources.Options_32;
-				//	a.QatSupport = true;
-				//	a.RibbonText = ("Repository", "Settings");
-				//	a.GetState += delegate ( EditorActionGetStateContext context )
-				//	{
-				//		context.Enabled = EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient;
-				//	};
-				//	a.Click += delegate ( EditorActionClickContext context )
-				//	{
-				//		RepositorySettingsFile.Settings settings = null;
+//				////Cloud Project Repository Settings
+//				//{
+//				//	var a = new EditorAction();
+//				//	a.Name = "Cloud Project Repository Settings";
+//				//	a.CommonType = EditorAction.CommonTypeEnum.General;
+//				//	a.Description = "Opens the repository settings dialog.";
+//				//	a.ImageSmall = Properties.Resources.Options_16;
+//				//	a.ImageBig = Properties.Resources.Options_32;
+//				//	a.QatSupport = true;
+//				//	a.RibbonText = ("Repository", "Settings");
+//				//	a.GetState += delegate ( EditorActionGetStateContext context )
+//				//	{
+//				//		context.Enabled = EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient;
+//				//	};
+//				//	a.Click += delegate ( EditorActionClickContext context )
+//				//	{
+//				//		RepositorySettingsFile.Settings settings = null;
 
-				//		var repositorySettingsFile = Path.Combine( VirtualFileSystem.Directories.AllFiles, "Repository.settings" );
-				//		if( File.Exists( repositorySettingsFile ) )
-				//		{
-				//			if( !RepositorySettingsFile.Load( repositorySettingsFile, out settings, out var error2 ) )
-				//			{
-				//				Log.Warning( "Unable to load Repository.settings. " + error2 );
-				//				return;
-				//			}
-				//		}
+//				//		var repositorySettingsFile = Path.Combine( VirtualFileSystem.Directories.AllFiles, "Repository.settings" );
+//				//		if( File.Exists( repositorySettingsFile ) )
+//				//		{
+//				//			if( !RepositorySettingsFile.Load( repositorySettingsFile, out settings, out var error2 ) )
+//				//			{
+//				//				Log.Warning( "Unable to load Repository.settings. " + error2 );
+//				//				return;
+//				//			}
+//				//		}
 
-				//		var form = new RepositorySettingsForm( settings );
-				//		if( form.ShowDialog() != DialogResult.OK )
-				//			return;
+//				//		var form = new RepositorySettingsForm( settings );
+//				//		if( form.ShowDialog() != DialogResult.OK )
+//				//			return;
 
-				//		var newSettings = form.GetNewSettings();
+//				//		var newSettings = form.GetNewSettings();
 
-				//		RepositorySettingsFile.Save( repositorySettingsFile, newSettings, out var error );
-				//		if( !string.IsNullOrEmpty( error ) )
-				//		{
-				//			Log.Warning( "Unable to save Repository.settings. " + error );
-				//			return;
-				//		}
+//				//		RepositorySettingsFile.Save( repositorySettingsFile, newSettings, out var error );
+//				//		if( !string.IsNullOrEmpty( error ) )
+//				//		{
+//				//			Log.Warning( "Unable to save Repository.settings. " + error );
+//				//			return;
+//				//		}
 
-				//		//!!!!translate
-				//		ScreenNotifications.Show( "The file was updated successfully." );
-				//		//ScreenNotifications.Show( Translate( "The file was updated successfully." ) );
-				//	};
-				//	EditorActions.Register( a );
-				//}
+//				//		//!!!!translate
+//				//		ScreenNotifications.Show( "The file was updated successfully." );
+//				//		//ScreenNotifications.Show( Translate( "The file was updated successfully." ) );
+//				//	};
+//				//	EditorActions.Register( a );
+//				//}
 
-			}
-#endif
+//			}
+//#endif
 
 		}
 

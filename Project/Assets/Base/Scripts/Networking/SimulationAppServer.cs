@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using NeoAxis;
 using NeoAxis.Networking;
@@ -19,7 +20,7 @@ namespace Project
 		static long projectID;
 		static string directModePassword = "";
 
-		static SimulationAppServerNode server;
+		static SimulationAppServerNode serverNode;
 		static string LastError { get; set; } = "";
 
 		static DateTime lastSendInfoFromApp;
@@ -59,7 +60,8 @@ namespace Project
 			ServerNetworkService_Users users;
 			ServerNetworkService_Chat chat;
 			ServerNetworkService_Components components;
-			ServerNetworkService_FileSync fileSync;
+			//!!!!CloudFunctions
+			//ServerNetworkService_FileSync fileSync;
 
 			//
 
@@ -82,9 +84,9 @@ namespace Project
 				components = new ServerNetworkService_Components( users );
 				RegisterService( components );
 
-				//register file sync service
-				fileSync = new ServerNetworkService_FileSync();
-				RegisterService( fileSync );
+				////register file sync service
+				//fileSync = new ServerNetworkService_FileSync();
+				//RegisterService( fileSync );
 			}
 
 			public ServerNetworkService_Messages Messages
@@ -107,10 +109,10 @@ namespace Project
 				get { return components; }
 			}
 
-			public ServerNetworkService_FileSync FileSync
-			{
-				get { return fileSync; }
-			}
+			//public ServerNetworkService_FileSync FileSync
+			//{
+			//	get { return fileSync; }
+			//}
 		}
 
 		/////////////////////////////////////////
@@ -137,19 +139,20 @@ namespace Project
 
 		public static bool Created
 		{
-			get { return Server != null; }
+			get { return ServerNode != null; }
 		}
 
-		public static SimulationAppServerNode Server
+		public static SimulationAppServerNode ServerNode
 		{
-			get { return server; }
+			get { return serverNode; }
 		}
 
 		public static void Init()
 		{
 			if( SystemSettings.CommandLineParameters.TryGetValue( "-server", out var projectServer ) && projectServer == "1" )
 			{
-				EngineInfo.SetEngineMode( EngineInfo.EngineModeEnum.CloudServer, null );
+				//!!!!new commented
+				//EngineInfo.SetEngineMode( EngineInfo.EngineModeEnum.CloudServer, null );
 
 				EngineApp.AppDestroy += EngineApp_AppDestroy;
 				SimulationApp.MainViewportRenderUI += SimulationApp_MainViewportRenderUI;
@@ -179,9 +182,10 @@ namespace Project
 
 				}
 
-				//get appContainer
-				if( SystemSettings.CommandLineParameters.TryGetValue( "-appContainer", out var appContainer ) && appContainer == "1" )
-					SystemSettings.AppContainer = true;
+				//!!!!no sense
+				////get appContainer
+				//if( SystemSettings.CommandLineParameters.TryGetValue( "-appContainer", out var appContainer ) && appContainer == "1" )
+				//	SystemSettings.AppContainer = true;
 
 				if( networkMode == NetworkModeEnum.CloudProject )
 				{
@@ -223,16 +227,23 @@ namespace Project
 
 		static bool CreateServer( out string error )
 		{
-			server = new SimulationAppServerNode( "NeoAxis Project Server", EngineInfo.Version, 100000, 0 );
-			server.ProtocolError += Server_ProtocolError;
-			server.IncomingConnectionApproval += Server_IncomingConnectionApproval;
-			server.ClientStatusChanged += Server_ClientStatusChanged;
-			server.Messages.ReceiveMessageString += Messages_ReceiveMessageString;
+			serverNode = new SimulationAppServerNode( "NeoAxis Project Server", EngineInfo.Version, 100000, 0 );
+			serverNode.ProtocolError += Server_ProtocolError;
+			serverNode.IncomingConnectionApproval += Server_IncomingConnectionApproval;
+			serverNode.ClientStatusChanged += Server_ClientStatusChanged;
+			serverNode.Messages.ReceiveMessageString += Messages_ReceiveMessageString;
 
-			if( !server.BeginListen( serverPort, 30, out error ) )
+			//configure Chat service
+			//if( ChatDefaultRoom )
+			serverNode.Chat.CreateRoom( "Default" );
+			//serverNode.Chat.AllowPrivateMessages = ChatPrivateMessages;
+
+			//https?
+
+			if( !serverNode.BeginListen( false, null, serverPort/*, 30*/, out error ) )
 			{
-				server.Dispose();// "" );
-				server = null;
+				serverNode.Dispose();
+				serverNode = null;
 				return false;
 			}
 
@@ -244,17 +255,17 @@ namespace Project
 			Log.Warning( "SimulationAppServer: Protocol error: " + message );
 		}
 
-		static void DestroyServer()// string reason = "The server has been destroyed." )
+		static void DestroyServer()
 		{
-			if( server != null )
+			if( serverNode != null )
 			{
-				server.ProtocolError -= Server_ProtocolError;
-				server.IncomingConnectionApproval -= Server_IncomingConnectionApproval;
-				server.ClientStatusChanged -= Server_ClientStatusChanged;
-				server.Messages.ReceiveMessageString -= Messages_ReceiveMessageString;
+				serverNode.ProtocolError -= Server_ProtocolError;
+				serverNode.IncomingConnectionApproval -= Server_IncomingConnectionApproval;
+				serverNode.ClientStatusChanged -= Server_ClientStatusChanged;
+				serverNode.Messages.ReceiveMessageString -= Messages_ReceiveMessageString;
 
-				server.Dispose();// reason );
-				server = null;
+				serverNode.Dispose();
+				serverNode = null;
 			}
 		}
 
@@ -332,27 +343,30 @@ namespace Project
 
 		private static void EngineApp_Tick( float delta )
 		{
-			if( server != null )
+			if( serverNode != null )
 			{
-				server.Update();
+				serverNode.Update();
 
 				//server.Components.Update();
 
 				//send info from app to server manager
-				if( server != null && networkMode == NetworkModeEnum.CloudProject )
+				if( serverNode != null && networkMode == NetworkModeEnum.CloudProject )
 				{
 					//!!!!how often to send
 					if( ( DateTime.Now - lastSendInfoFromApp ).TotalSeconds > 2 )
 					{
 						var block = new TextBlock();
 
-						block.SetAttribute( "Clients", server.ClientCount.ToString() );
+						block.SetAttribute( "Clients", serverNode.ClientCount.ToString() );
 						//block.SetAttribute( "StatusFromProjectApp", StatusFromProjectApp );
 
 						var text = block.DumpToString() + "[[!END!]]";
 
 						try
 						{
+
+							//!!!!
+
 							var fullPath = Path.Combine( VirtualFileSystem.Directories.AllFiles, "MessageToServerManager.txt" );
 							File.WriteAllText( fullPath, text );
 						}
@@ -362,7 +376,7 @@ namespace Project
 					}
 				}
 
-				if( server != null && networkMode == NetworkModeEnum.CloudProject )
+				if( serverNode != null && networkMode == NetworkModeEnum.CloudProject )
 					TouchUserVerificationCodes();
 			}
 		}
@@ -376,7 +390,7 @@ namespace Project
 				var lines = new List<string>();
 
 				lines.Add( "Project server manager is initialized." );
-				if( server != null )
+				if( serverNode != null )
 					lines.Add( "Project server is created." );
 
 				if( !string.IsNullOrEmpty( LastError ) )
@@ -393,22 +407,22 @@ namespace Project
 		{
 			////called from thread
 
-			var connectedNode = (ServerNode.Client)command.Tag;
+			var client = (ServerNode.Client)command.Tag;
 			//var clientData = (ClientData)connectedNode.Tag;
 
 			if( !string.IsNullOrEmpty( command.Result.Error ) )
 			{
-				server.DisconnectClient( connectedNode, command.Result.Error );
+				serverNode.DisconnectClient( client, command.Result.Error );
 				//DisconnectConnectedNode( connectedNode, "Error:" + command.Result.Error );
 				return;
 			}
 
 			//set userID, username
 			var block = command.Result.Data;
-			connectedNode.LoginDataUserID = long.Parse( block.GetAttribute( "UserID" ) );
-			connectedNode.LoginDataUsername = block.GetAttribute( "Username" );
+			client.LoginDataUserID = long.Parse( block.GetAttribute( "UserID" ) );
+			client.LoginDataUsername = block.GetAttribute( "Username" );
 
-			OnClientConnected( connectedNode );
+			OnClientConnected( client );
 		}
 
 		private static void Server_ClientStatusChanged( ServerNode sender, ServerNode.Client client, /*NetworkStatus status, */string message )
@@ -431,16 +445,20 @@ namespace Project
 						//start checking verification code
 						var command = new GeneralManagerExecuteCommand();
 						command.FunctionName = "api/get_user_by_verification_code";
-						command.Parameters.Add( ("project", projectID.ToString()) );
-						command.Parameters.Add( ("purpose", "Enter") );
-						command.Parameters.Add( ("code", clientData.VerificationCode) );
+						command.AddParameter( "project", projectID.ToString(), true );
+
+						//!!!!
+						Log.Fatal( "userRole" );
+
+						command.AddParameter( "purpose", "Enter", true );
+						command.AddParameter( "code", clientData.VerificationCode, true );
 						command.Tag = client;
 						command.Processed += GeneralManagerExecuteGetUserByVerificationCodeProcessed;
 						command.BeginExecution( true );
 					}
 					else
 					{
-						client.LoginDataUserID = server.Users.GetFreeUserID();
+						client.LoginDataUserID = serverNode.Users.GetDirectConnectionFreeUserID();
 
 						var username = clientData.Username;
 						if( string.IsNullOrEmpty( username ) )
@@ -453,14 +471,7 @@ namespace Project
 				break;
 
 			case NetworkStatus.Disconnected:
-				{
-					OnClientDisconnected( client );
-
-					//remove user
-					var user = server.Users.GetUser( client );
-					if( user != null )
-						server.Users.RemoveUser( user );
-				}
+				OnClientDisconnected( client );
 				break;
 			}
 		}
@@ -473,15 +484,15 @@ namespace Project
 
 			if( !string.IsNullOrEmpty( command.Result.Error ) )
 			{
-				server.DisconnectClient( client, command.Result.Error );
+				serverNode.DisconnectClient( client, command.Result.Error );
 				return;
 			}
 
 			var block = command.Result.Data;
 			var avatar = block.GetAttribute( "Avatar" );
 
-			if( server != null )
-				server.Messages.SendToClient( client, "AvatarSettings", avatar );
+			if( serverNode != null )
+				serverNode.Messages.SendToClient( client, "AvatarSettings", avatar );
 		}
 
 		private static void Messages_ReceiveMessageString( ServerNetworkService_Messages sender, ServerNode.Client source, string message, string data )
@@ -491,7 +502,7 @@ namespace Project
 			if( SimulationApp.NetworkLogging )
 				Log.Info( string.Format( "Message from {0}: {1}", source.LoginDataUserID, message ) );
 
-			if( server != null )
+			if( serverNode != null )
 			{
 				if( networkMode == NetworkModeEnum.CloudProject )
 				{
@@ -502,15 +513,15 @@ namespace Project
 
 					if( message == "RequestAvatarSettings" )
 					{
-						var user = server.Users.GetUser( source );
+						var user = serverNode.Users.GetUser( source );
 						if( user != null )
 						{
-							server?.Messages.SendToClient( source, "AvatarSettings", user.DirectServerAvatar );
+							serverNode?.Messages.SendToClient( source, "AvatarSettings", user.DirectServerAvatar );
 						}
 					}
 					else if( message == "SetAvatarSettings" )
 					{
-						var user = server.Users.GetUser( source );
+						var user = serverNode.Users.GetUser( source );
 						if( user != null )
 							user.DirectServerAvatar = data;
 					}
@@ -561,15 +572,15 @@ namespace Project
 
 					if( message == "RequestAvatarSettings" )
 					{
-						var user = server.Users.GetUser( source );
+						var user = serverNode.Users.GetUser( source );
 						if( user != null )
 						{
-							server?.Messages.SendToClient( source, "AvatarSettings", user.DirectServerAvatar );
+							serverNode?.Messages.SendToClient( source, "AvatarSettings", user.DirectServerAvatar );
 						}
 					}
 					else if( message == "SetAvatarSettings" )
 					{
-						var user = server.Users.GetUser( source );
+						var user = serverNode.Users.GetUser( source );
 						if( user != null )
 							user.DirectServerAvatar = data;
 					}
@@ -581,35 +592,40 @@ namespace Project
 		{
 			ResetScene();
 
-			if( server != null )
-				server.Components.SetScene( scene, sceneInfo );
+			if( serverNode != null )
+				serverNode.Components.SetScene( scene, sceneInfo );
 		}
 
 		public static void ResetScene()
 		{
-			if( server != null && server.Components.Scene != null )
-				server.Components.ResetScene();
+			if( serverNode != null && serverNode.Components.Scene != null )
+				serverNode.Components.ResetScene();
 		}
 
 		static void OnClientConnected( ServerNode.Client client )
 		{
 			var clientData = (ClientData)client.Tag;
 
-			//add to users service and send events to clients
-			server.Users.AddUser( client );
-
 			//set to Verified state
 			clientData.Verified = true;
-			server.Messages.SendToClient( client, "Verified", "" );
+			serverNode.Messages.SendToClient( client, "Verified", "" );
+
+			//add to users service, with sending events to clients
+			var user = serverNode.Users.AddUser( client );
+
+			//add user to Default chat room
+			var defaultRoom = serverNode.Chat.GetRoom( "Default" );
+			if( defaultRoom != null )
+				serverNode.Chat.AddUserToRoom( defaultRoom, user );
 
 			//!!!!add code here when don't want send scene to the client
 
 			//send initial scene state
-			if( server.Components.Scene != null )
+			if( serverNode.Components.Scene != null )
 			{
-				var clientItem = server.Components.GetClientItem( client );
+				var clientItem = serverNode.Components.GetClientItem( client );
 				if( clientData != null )
-					server.Components.SendSceneCreate( clientItem );
+					serverNode.Components.SendSceneCreate( clientItem );
 			}
 		}
 
@@ -619,10 +635,18 @@ namespace Project
 
 			//if( server.Components.Scene != null )
 			//{
-			var clientItem = server.Components.GetClientItem( client );
+			var clientItem = serverNode.Components.GetClientItem( client );
 			if( clientData != null )
-				server.Components.ClientDisconnected( clientItem );
+				serverNode.Components.ClientDisconnected( clientItem );
 			//}
+
+			//remove user
+			var user = serverNode.Users.GetUser( client );
+			if( user != null )
+			{
+				serverNode.Chat.RemoveUser( user );
+				serverNode.Users.RemoveUser( user );
+			}
 		}
 
 		static void TouchUserVerificationCodes()
@@ -631,7 +655,7 @@ namespace Project
 
 			if( ( now - lastTouchUserVerificationCodes ).TotalSeconds > 10 )
 			{
-				foreach( var client in server.GetClientsArray() )
+				foreach( var client in serverNode.GetClientsArray() )
 				{
 
 					//!!!!check
@@ -642,9 +666,13 @@ namespace Project
 					{
 						var command = new GeneralManagerExecuteCommand();
 						command.FunctionName = "api/get_user_by_verification_code";
-						command.Parameters.Add( ("project", projectID.ToString()) );
-						command.Parameters.Add( ("purpose", "Enter") );
-						command.Parameters.Add( ("code", clientData.VerificationCode) );
+						command.AddParameter( "project", projectID.ToString(), true );
+
+						//!!!!
+						Log.Fatal( "userRole" );
+
+						command.AddParameter( "purpose", "Enter", true );
+						command.AddParameter( "code", clientData.VerificationCode, true );
 						command.Tag = client;
 						//command.Processed += GeneralManagerExecuteCommandProcessed;
 						command.BeginExecution( false );

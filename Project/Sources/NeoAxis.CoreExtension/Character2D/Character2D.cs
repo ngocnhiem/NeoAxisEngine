@@ -680,9 +680,9 @@ namespace NeoAxis
 
 								if( NetworkIsServer )
 								{
-									var writer = BeginNetworkMessageToEveryone( "TickMovement" );
-									writer.Write( (float)forceIsOnGroundRemainingTime );
-									EndNetworkMessage();
+									var m = BeginNetworkMessageToEveryone( "TickMovement" );
+									m.Writer.Write( (float)forceIsOnGroundRemainingTime );
+									m.End();
 								}
 							}
 
@@ -1100,8 +1100,9 @@ namespace NeoAxis
 
 				if( NetworkIsServer && ( TypeCached.JumpSound.ReferenceOrValueSpecified || TypeCached.JumpAnimation.ReferenceOrValueSpecified ) )
 				{
-					BeginNetworkMessageToEveryone( "Jump" );
-					EndNetworkMessage();
+					var m = BeginNetworkMessageToEveryone( "Jump" );
+					if( m != null )
+						m.End();
 				}
 
 				OnJump();
@@ -1146,8 +1147,9 @@ namespace NeoAxis
 			if( Crouching )
 				return;
 
-			BeginNetworkMessageToServer( "Jump" );
-			EndNetworkMessage();
+			var m = BeginNetworkMessageToServer( "Jump" );
+			if( m != null )
+				m.End();
 		}
 
 		[Browsable( false )]
@@ -1887,12 +1889,12 @@ namespace NeoAxis
 			var component = item as Component;
 			if( component != null )
 			{
-				var writer = BeginNetworkMessageToServer( "ItemDrop" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "ItemDrop" );
+				if( m != null )
 				{
-					writer.WriteVariableUInt64( (ulong)component.NetworkID );
-					writer.WriteVariableInt32( amount );
-					EndNetworkMessage();
+					m.Writer.WriteVariableUInt64( (ulong)component.NetworkID );
+					m.Writer.WriteVariableInt32( amount );
+					m.End();
 				}
 			}
 		}
@@ -1955,12 +1957,12 @@ namespace NeoAxis
 		{
 			var item2 = (ObjectInSpace)item;
 
-			var writer = BeginNetworkMessageToServer( "ItemTakeAndActivate" );
-			if( writer != null )
+			var m = BeginNetworkMessageToServer( "ItemTakeAndActivate" );
+			if( m != null )
 			{
-				writer.WriteVariableUInt64( (ulong)item2.NetworkID );
-				writer.Write( activate );
-				EndNetworkMessage();
+				m.Writer.WriteVariableUInt64( (ulong)item2.NetworkID );
+				m.Writer.Write( activate );
+				m.End();
 			}
 		}
 
@@ -1968,11 +1970,11 @@ namespace NeoAxis
 		{
 			var item2 = (ObjectInSpace)item;
 
-			var writer = BeginNetworkMessageToServer( "ItemActivate" );
-			if( writer != null )
+			var m = BeginNetworkMessageToServer( "ItemActivate" );
+			if( m != null )
 			{
-				writer.WriteVariableUInt64( (ulong)item2.NetworkID );
-				EndNetworkMessage();
+				m.Writer.WriteVariableUInt64( (ulong)item2.NetworkID );
+				m.End();
 			}
 		}
 
@@ -1980,11 +1982,11 @@ namespace NeoAxis
 		{
 			var item2 = (ObjectInSpace)item;
 
-			var writer = BeginNetworkMessageToServer( "ItemDeactivate" );
-			if( writer != null )
+			var m = BeginNetworkMessageToServer( "ItemDeactivate" );
+			if( m != null )
 			{
-				writer.WriteVariableUInt64( (ulong)item2.NetworkID );
-				EndNetworkMessage();
+				m.Writer.WriteVariableUInt64( (ulong)item2.NetworkID );
+				m.End();
 			}
 		}
 

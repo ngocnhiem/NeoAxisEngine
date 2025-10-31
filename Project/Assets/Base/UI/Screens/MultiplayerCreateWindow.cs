@@ -121,7 +121,7 @@ namespace Project
 					scenePaths.Add( file );
 
 					string itemText = showOnlyFileNames ? Path.GetFileName( file ) : file;
-					list.Items.Add( itemText );
+					list.AddItem( itemText );
 
 					if( file == lastScene )
 						list.SelectedIndex = list.Items.Count - 1;

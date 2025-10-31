@@ -648,6 +648,7 @@ namespace NeoAxis
 				while( !command.processed )
 				{
 					UpdateFromMainThread();
+					//!!!!
 					Thread.Sleep( 0 );
 				}
 			}

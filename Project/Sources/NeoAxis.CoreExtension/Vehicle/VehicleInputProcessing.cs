@@ -155,12 +155,12 @@ namespace NeoAxis
 			{
 				if( NetworkIsClient )
 				{
-					var writer = BeginNetworkMessageToServer( "RemoveObjectFromSeat" );
-					if( writer != null )
+					var m = BeginNetworkMessageToServer( "RemoveObjectFromSeat" );
+					if( m != null )
 					{
-						writer.WriteVariableInt32( seatIndex );
-						writer.WriteVariableUInt64( (ulong)obj.NetworkID );
-						EndNetworkMessage();
+						m.Writer.WriteVariableInt32( seatIndex );
+						m.Writer.WriteVariableUInt64( (ulong)obj.NetworkID );
+						m.End();
 					}
 				}
 				else
@@ -263,11 +263,11 @@ namespace NeoAxis
 
 							if( NetworkIsClient )
 							{
-								var writer = BeginNetworkMessageToServer( "HeadlightsLow" );
-								if( writer != null )
+								var m = BeginNetworkMessageToServer( "HeadlightsLow" );
+								if( m != null )
 								{
-									writer.Write( value );
-									EndNetworkMessage();
+									m.Writer.Write( value );
+									m.End();
 								}
 							}
 							else
@@ -285,11 +285,11 @@ namespace NeoAxis
 
 							if( NetworkIsClient )
 							{
-								var writer = BeginNetworkMessageToServer( "HeadlightsHigh" );
-								if( writer != null )
+								var m = BeginNetworkMessageToServer( "HeadlightsHigh" );
+								if( m != null )
 								{
-									writer.Write( value );
-									EndNetworkMessage();
+									m.Writer.Write( value );
+									m.End();
 								}
 							}
 							else
@@ -307,11 +307,11 @@ namespace NeoAxis
 
 							if( NetworkIsClient )
 							{
-								var writer = BeginNetworkMessageToServer( "LeftTurnSignal" );
-								if( writer != null )
+								var m = BeginNetworkMessageToServer( "LeftTurnSignal" );
+								if( m != null )
 								{
-									writer.Write( value );
-									EndNetworkMessage();
+									m.Writer.Write( value );
+									m.End();
 								}
 							}
 							else
@@ -324,11 +324,11 @@ namespace NeoAxis
 
 							if( NetworkIsClient )
 							{
-								var writer = BeginNetworkMessageToServer( "RightTurnSignal" );
-								if( writer != null )
+								var m = BeginNetworkMessageToServer( "RightTurnSignal" );
+								if( m != null )
 								{
-									writer.Write( value );
-									EndNetworkMessage();
+									m.Writer.Write( value );
+									m.End();
 								}
 							}
 							else
@@ -444,9 +444,11 @@ namespace NeoAxis
 
 					//!!!!не нужно слать если не менялось
 
-					var writer = BeginNetworkMessageToServer( "UpdateObjectControlVehicle" );
-					if( writer != null )
+					var m = BeginNetworkMessageToServer( "UpdateObjectControlVehicle" );
+					if( m != null )
 					{
+						var writer = m.Writer;
+
 						writer.Write( new HalfType( throttle ) );
 						writer.Write( new HalfType( brake ? 1.0 : 0.0 ) );
 						writer.Write( new HalfType( steering ) );
@@ -455,7 +457,7 @@ namespace NeoAxis
 						if( vehicle.RequiredLookToPosition.HasValue )
 							writer.Write( vehicle.RequiredLookToPosition.Value );
 
-						EndNetworkMessage();
+						m.End();
 					}
 				}
 				else

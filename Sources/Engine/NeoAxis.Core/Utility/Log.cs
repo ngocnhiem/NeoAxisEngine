@@ -560,7 +560,8 @@ namespace NeoAxis
 			if( string.IsNullOrEmpty( dumpRealFileName ) )
 				return null;
 
-			string time = DateTime.Now.ToString( "dd-MM-yyyy_HH-mm-ss" );
+			var time = DateTime.Now.ToString( "yyyy-MM-dd-HH-mm-ss" );
+			//string time = DateTime.Now.ToString( "dd-MM-yyyy_HH-mm-ss" );
 
 			string destFileName = Path.GetDirectoryName( Log.DumpRealFileName ) + "/FatalError_" +
 				Path.GetFileNameWithoutExtension( Log.DumpRealFileName ) + "_" + time +

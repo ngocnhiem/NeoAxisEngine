@@ -422,12 +422,16 @@ namespace NeoAxis
 			//send Hit to clients
 			if( NetworkIsServer )
 			{
-				var writer = BeginNetworkMessageToEveryone( "Hit" );
-				writer.Write( fixedHitPosition );
-				writer.Write( hit.Normal.ToVector3F() );
-				writer.Write( hit.PhysicalBody != null );
-				writer.WriteVariableUInt64( (ulong)( hitSceneObject != null ? hitSceneObject.NetworkID : 0 ) );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "Hit" );
+				if( m != null )
+				{
+					var writer = m.Writer;
+					writer.Write( fixedHitPosition );
+					writer.Write( hit.Normal.ToVector3F() );
+					writer.Write( hit.PhysicalBody != null );
+					writer.WriteVariableUInt64( (ulong)( hitSceneObject != null ? hitSceneObject.NetworkID : 0 ) );
+					m.End();
+				}
 			}
 
 			//OnHit( hit );

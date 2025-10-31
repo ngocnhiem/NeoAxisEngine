@@ -59,22 +59,25 @@ namespace Project
 
 			if( EngineApp.IsSimulation )
 			{
-				GetListMessages().Items.Clear();
+				GetListMessages().ClearItems();
 
-				if( SimulationAppClient.Client != null )
+				if( SimulationAppClient.Client?.Chat != null )
 				{
 					if( EnabledInHierarchyAndIsInstance )
 					{
-						//!!!!
 						//colorAlpha = 0;
 
-						foreach( var message in SimulationAppClient.Client.Chat.LastMessages )
-							AddListMessageChatMessage( message.FromUser, message.Text );
+						var defaultRoom = SimulationAppClient.Client.Chat.GetRoom( "Default" );
+						if( defaultRoom != null )
+						{
+							foreach( var message in defaultRoom.Messages )
+								AddListMessageChatMessage( message );
+						}
 
-						SimulationAppClient.Client.Chat.ReceiveText += Chat_ReceiveText;
+						SimulationAppClient.Client.Chat.ReceivedRoomMessage += Chat_ReceivedRoomMessage;
 					}
 					else
-						SimulationAppClient.Client.Chat.ReceiveText -= Chat_ReceiveText;
+						SimulationAppClient.Client.Chat.ReceivedRoomMessage -= Chat_ReceivedRoomMessage;
 				}
 			}
 		}
@@ -102,8 +105,9 @@ namespace Project
 		{
 			if( NetworkLogic != null )
 			{
-				NetworkLogic.BeginNetworkMessageToServer( "TryLeaveWorld" );
-				NetworkLogic.EndNetworkMessage();
+				var m = NetworkLogic.BeginNetworkMessageToServer( "TryLeaveWorld" );
+				if( m != null )
+					m.End();
 			}
 
 			RemoveFromParent( true );
@@ -146,8 +150,11 @@ namespace Project
 			if( text == "" )
 				return false;
 
-			SimulationAppClient.Client?.Chat.SayToEveryone( text );
+			var defaultRoom = SimulationAppClient.Client?.Chat?.GetRoom( "Default" );
+			if( defaultRoom == null )
+				return false;
 
+			SimulationAppClient.Client.Chat.SayInRoom( defaultRoom, text );
 			GetEditMessage().Text = "";
 
 			return true;
@@ -157,32 +164,40 @@ namespace Project
 		{
 			var list = GetListMessages();
 
-			list.Items.Add( text );
+			list.AddItem( text );
 
-			if( list.Items.Count > ClientNetworkService_Chat.MaxLastMessages )
-				list.Items.RemoveAt( 0 );
+			if( SimulationAppClient.Client != null )
+			{
+				while( list.Items.Count > SimulationAppClient.Client.Chat.MaxMessagesInRoom )
+					list.RemoveItem( 0 );
+			}
 
 			list.SelectedIndex = list.Items.Count - 1;
 			list.EnsureVisible( list.Items.Count - 1 );
 		}
 
-		public delegate void AddListMessageChatMessageBeforeDelegate( InGameContextScreen sender, ClientNetworkService_Users.UserInfo fromUser, string text, ref bool skip );
+		public delegate void AddListMessageChatMessageBeforeDelegate( InGameContextScreen sender, ClientNetworkService_Chat.RoomMessage message, ref bool skip );
 		public event AddListMessageChatMessageBeforeDelegate AddListMessageChatMessageBefore;
 
-		void AddListMessageChatMessage( ClientNetworkService_Users.UserInfo fromUser, string text )
+		void AddListMessageChatMessage( ClientNetworkService_Chat.RoomMessage message )
 		{
 			var skip = false;
-			AddListMessageChatMessageBefore?.Invoke( this, fromUser, text, ref skip );
+			AddListMessageChatMessageBefore?.Invoke( this, message, ref skip );
 			if( skip )
 				return;
 
-			var str = $"{fromUser.Username}: {text}";
+			var chatService = SimulationAppClient.Client?.Chat;
+
+			var user = chatService.UsersService.GetUser( message.UserID );
+			var userString = user != null ? user.Username : message.UserID.ToString();
+
+			var str = $"{userString}: {message.Text}";
 			AddListMessage( str );
 		}
 
-		private void Chat_ReceiveText( ClientNetworkService_Chat sender, ClientNetworkService_Users.UserInfo fromUser, string text )
+		private void Chat_ReceivedRoomMessage( ClientNetworkService_Chat sender, ClientNetworkService_Chat.RoomMessage message )
 		{
-			AddListMessageChatMessage( fromUser, text );
+			AddListMessageChatMessage( message );
 		}
 	}
 }

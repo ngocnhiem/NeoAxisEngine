@@ -118,6 +118,71 @@ namespace NeoAxis
 				}
 			}
 		}
+
+		public static void DeleteEmptyDirectories( string targetDirectory, SearchOption searchOption, bool disableExceptions )
+		{
+			if( searchOption == SearchOption.AllDirectories )
+			{
+				if( Directory.Exists( targetDirectory ) )
+				{
+					try
+					{
+						foreach( string directory in Directory.GetDirectories( targetDirectory ) )
+							DeleteEmptyDirectories( directory, SearchOption.AllDirectories, disableExceptions );
+					}
+					catch( Exception ) when( disableExceptions )
+					{
+					}
+
+					try
+					{
+						if( Directory.GetFiles( targetDirectory ).Length == 0 && Directory.GetDirectories( targetDirectory ).Length == 0 )
+						{
+							try
+							{
+								Directory.Delete( targetDirectory );
+							}
+							catch( Exception ) when( disableExceptions )
+							{
+							}
+						}
+					}
+					catch( Exception ) when( disableExceptions )
+					{
+					}
+				}
+			}
+			else
+			{
+				if( Directory.Exists( targetDirectory ) )
+				{
+					try
+					{
+						foreach( string directory in Directory.GetDirectories( targetDirectory ) )
+						{
+							try
+							{
+								if( Directory.GetFiles( directory ).Length == 0 && Directory.GetDirectories( directory ).Length == 0 )
+								{
+									try
+									{
+										Directory.Delete( directory );
+									}
+									catch( Exception ) when( disableExceptions )
+									{
+									}
+								}
+							}
+							catch( Exception ) when( disableExceptions )
+							{
+							}
+						}
+					}
+					catch( Exception ) when( disableExceptions )
+					{
+					}
+				}
+			}
+		}
 	}
 }
-

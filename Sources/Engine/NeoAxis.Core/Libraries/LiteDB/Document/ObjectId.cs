@@ -327,7 +327,22 @@ namespace Internal.LiteDB
             return new ObjectId((int)timestamp, _machine, _pid, inc);
         }
 
-        #endregion
-    }
+		//!!!!betauser
+		public static bool TryParse( string str, out ObjectId result )
+		{
+			try
+			{
+				result = new ObjectId( str );
+				return true;
+			}
+			catch
+			{
+				result = ObjectId.Empty;
+				return false;
+			}
+		}
+
+		#endregion
+	}
 }
 #endif

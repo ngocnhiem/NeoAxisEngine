@@ -24,7 +24,7 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>	
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <OutputPath>..\..\..\Project\Binaries\</OutputPath>

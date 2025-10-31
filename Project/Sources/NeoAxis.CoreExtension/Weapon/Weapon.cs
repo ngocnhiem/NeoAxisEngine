@@ -375,9 +375,12 @@ namespace NeoAxis
 
 			if( NetworkIsServer )
 			{
-				var writer = BeginNetworkMessageToEveryone( "FiringBegin" );
-				writer.WriteVariableInt32( mode );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "FiringBegin" );
+				if( m != null )
+				{
+					m.Writer.WriteVariableInt32( mode );
+					m.End();
+				}
 			}
 
 			FiringBeginEvent?.Invoke( this, mode );
@@ -392,11 +395,11 @@ namespace NeoAxis
 			//if( IsFiring( mode ) )
 			//	return;
 
-			var writer = BeginNetworkMessageToServer( "FiringBeginFromClient" );
-			if( writer != null )
+			var m = BeginNetworkMessageToServer( "FiringBeginFromClient" );
+			if( m != null )
 			{
-				writer.WriteVariableInt32( mode );
-				EndNetworkMessage();
+				m.Writer.WriteVariableInt32( mode );
+				m.End();
 			}
 		}
 

@@ -164,83 +164,8 @@ namespace NeoAxis.Editor
 					}
 				}
 
-				//{
-				//	WebRequest request = WebRequest.Create( @"https://www.neoaxis.com/api/get_license/" );
-				//	//WebRequest request = WebRequest.Create( @"https://store.neoaxis.com/api/check_login/" );
-				//	request.Method = "POST";
-				//	request.ContentType = "application/x-www-form-urlencoded";
-				//	request.ContentLength = dataStream.Length;
-				//	Stream newStream = request.GetRequestStream();
-				//	newStream.Write( dataStream, 0, dataStream.Length );
-				//	newStream.Close();
-
-				//	string text;
-				//	using( var response = (HttpWebResponse)request.GetResponse() )
-				//	using( var stream = response.GetResponseStream() )
-				//	using( var reader = new StreamReader( stream ) )
-				//		text = reader.ReadToEnd();
-
-				//	requestedFullLicenseInfo_Error = "";
-				//	if( !string.IsNullOrEmpty( text ) )
-				//		requestedFullLicenseInfo_License = text;
-				//	//if( text.Contains( "Pro" ) )
-				//	//	requestedFullLicenseInfo_License = "Pro";
-				//	//else if( text.Contains( "Personal" ) )
-				//	//	requestedFullLicenseInfo_License = "Personal";
-				//	//else if( !string.IsNullOrEmpty( text ) )
-				//	//	requestedFullLicenseInfo_License = text;
-				//	//if( text.Contains( "True" ) )
-				//	//	requestedFullLicenseInfo_License = "Registered";
-				//	else
-				//	{
-				//		requestedFullLicenseInfo_License = "";
-				//		requestedFullLicenseInfo_Error = "Invalid username or password.";
-				//	}
-				//}
-
-				////get purchased products
-				//{
-				//	WebRequest request = WebRequest.Create( @"https://store.neoaxis.com/api/get_purchased_products/" );
-				//	request.Method = "POST";
-				//	request.ContentType = "application/x-www-form-urlencoded";
-				//	request.ContentLength = dataStream.Length;
-				//	Stream newStream = request.GetRequestStream();
-				//	newStream.Write( dataStream, 0, dataStream.Length );
-				//	newStream.Close();
-
-				//	string text;
-				//	using( var response = (HttpWebResponse)request.GetResponse() )
-				//	using( var stream = response.GetResponseStream() )
-				//	using( var reader = new StreamReader( stream ) )
-				//		text = reader.ReadToEnd();
-
-				//	var products = text.Trim().Split( new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries );
-				//	foreach( var product in products )
-				//		requestedFullLicenseInfo_PurchasedProducts.AddWithCheckAlreadyContained( product );
-				//}
-
-				////get token transactions
-				//{
-				//	WebRequest request = WebRequest.Create( @"https://store.neoaxis.com/api/get_token_transactions/" );
-				//	request.Method = "POST";
-				//	request.ContentType = "application/x-www-form-urlencoded";
-				//	request.ContentLength = dataStream.Length;
-				//	Stream newStream = request.GetRequestStream();
-				//	newStream.Write( dataStream, 0, dataStream.Length );
-				//	newStream.Close();
-
-				//	string text;
-				//	using( var response = (HttpWebResponse)request.GetResponse() )
-				//	using( var stream = response.GetResponseStream() )
-				//	using( var reader = new StreamReader( stream ) )
-				//		text = reader.ReadToEnd();
-
-				//	requestedFullLicenseInfo_TokenTransactions = text;
-				//}
-
 				//SaveLicenseCertificate2();
 				//EngineApp.needReadLicenseCertificate = true;
-
 
 				licenseCached = null;
 			}

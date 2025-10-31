@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.IO;
+//using System.Text.Json;
 
 namespace NeoAxis
 {
@@ -188,5 +189,181 @@ namespace NeoAxis
 		{
 			return SaveToRealFile( block, VirtualPathUtility.GetRealPathByVirtual( path ) );
 		}
+
+		///////////////////////////////////////////////
+
+		//json conversion is not finished
+
+		//public static Dictionary<string, object> ConvertTextBlockToJson( TextBlock textBlock )
+		//{
+		//	var result = new Dictionary<string, object>();
+
+		//	foreach( var attr in textBlock.Attributes )
+		//		result[ attr.Name ] = attr.Value;
+
+		//	//"runtime": {
+		//	//	"library_path": ".\\MixedRealityRuntime.dll"
+
+		//	var counter = 1;
+
+		//	foreach( var childBlock in textBlock.Children )
+		//	{
+		//		var attributes = ConvertTextBlockToJson( childBlock );
+
+		//		if( !string.IsNullOrEmpty( childBlock.Data ) )
+		//			attributes[ "_data" ] = childBlock.Data;
+
+		//		result[ childBlock.Name + counter.ToString() ] = attributes;
+		//		counter++;
+
+		//		//result[ childBlock.Name ] = attributes;
+
+
+		//		//!!!!sub blocks?
+
+		//		//var attributes = new Dictionary<string, object>();
+
+		//		//var childData = ConvertTextBlockToJson( childBlock );
+		//		//children.Add( childData );
+		//	}
+
+
+		//	//if( textBlock.Children.Count != 0 )
+		//	//{
+		//	//	var children = new List<Dictionary<string, object>>();
+
+		//	//	foreach( var childBlock in textBlock.Children )
+		//	//	{
+
+		//	//		//childBlock.Name
+		//	//		//childBlock.Data
+
+
+		//	//		//!!!!lists, elements?
+
+		//	//		var childData = ConvertTextBlockToJson( childBlock );
+		//	//		children.Add( childData );
+		//	//	}
+
+		//	//	result[ "children" ] = children;
+		//	//}
+
+		//	return result;
+		//}
+
+		//public static string ConvertTextBlockToJsonSerialized( TextBlock textBlock )
+		//{
+		//	var jsonData = ConvertTextBlockToJson( textBlock );
+		//	var serialized = JsonSerializer.Serialize( jsonData, new JsonSerializerOptions { WriteIndented = true } );
+		//	return serialized;
+		//}
+
+		//public static TextBlock ConvertJsonToTextBlock( Dictionary<string, object> json )
+		//{
+		//	var result = new TextBlock();
+
+		//	foreach( var pair in json )
+		//	{
+		//		if( pair.Value is JsonElement element )
+		//		{
+		//			switch( element.ValueKind )
+		//			{
+		//			case JsonValueKind.Object:
+		//				{
+		//					// Child block
+		//					var childDict = JsonSerializer.Deserialize<Dictionary<string, object>>( element.GetRawText() );
+		//					var childBlock = ConvertJsonToTextBlock( childDict );
+		//					childBlock.Name = pair.Key;
+		//					result.AddChild( childBlock );
+		//					break;
+		//				}
+		//			case JsonValueKind.Array:
+		//				{
+		//					// Array of child blocks or values
+		//					foreach( var item in element.EnumerateArray() )
+		//					{
+		//						if( item.ValueKind == JsonValueKind.Object )
+		//						{
+		//							var childDict = JsonSerializer.Deserialize<Dictionary<string, object>>( item.GetRawText() );
+		//							var childBlock = ConvertJsonToTextBlock( childDict );
+		//							childBlock.Name = pair.Key;
+		//							result.AddChild( childBlock );
+		//						}
+		//						else
+		//						{
+		//							// Array of primitive values as attributes
+		//							result.SetAttribute( pair.Key, item.ToString() );
+		//						}
+		//					}
+		//					break;
+		//				}
+		//			default:
+		//				{
+		//					// Attribute or special _data
+		//					if( pair.Key == "_data" )
+		//						result.Data = element.ToString();
+		//					else
+		//						result.SetAttribute( pair.Key, element.ToString() );
+		//					break;
+		//				}
+		//			}
+		//		}
+		//		else if( pair.Value is Dictionary<string, object> dict )
+		//		{
+		//			// Child block
+		//			var childBlock = ConvertJsonToTextBlock( dict );
+		//			childBlock.Name = pair.Key;
+		//			result.AddChild( childBlock );
+		//		}
+		//		//else if( pair.Key == "_data" )
+		//		//{
+		//		//	result.Data = pair.Value?.ToString();
+		//		//}
+		//		//else if( pair.Value is System.Text.Json.JsonElement je )
+		//		//{
+		//		//	result.SetAttribute( pair.Key, je.ToString() );
+		//		//}
+		//		else
+		//		{
+		//			// Attribute
+		//			if( pair.Value != null )
+		//				result.SetAttribute( pair.Key, pair.Value.ToString() );
+		//		}
+		//	}
+
+		//	return result;
+		//}
+
+		//public static TextBlock ConvertJsonToTextBlock( string json )
+		//{
+		//	//!!!!ExpandoObject
+
+		//	var json2 = JsonSerializer.Deserialize<Dictionary<string, object>>( json, new JsonSerializerOptions() );
+		//	return ConvertJsonToTextBlock( json2 );
+		//}
+
+		////public static TextBlock ConvertJsonToTextBlock( Dictionary<string, object> json )
+		////{
+		////	var result = new TextBlock();
+
+		////	foreach( var pair in json )
+		////	{
+		////		if( pair.Value != null )
+		////			result.SetAttribute( pair.Key, pair.Value.ToString() );
+		////	}
+
+		////	//!!!!
+
+		////	return result;
+		////}
+
+		////public static TextBlock ConvertJsonToTextBlock( string json )
+		////{
+
+		////	//!!!!ExpandoObject
+
+		////	var json2 = JsonSerializer.Deserialize<Dictionary<string, object>>( json, new JsonSerializerOptions() );
+		////	return ConvertJsonToTextBlock( json2 );
+		////}
 	}
 }

@@ -27,8 +27,14 @@ namespace NeoAxis
 
 		public Sphere( Vector3 center, double radius )
 		{
-			this.Center = center;
-			this.Radius = radius;
+			Center = center;
+			Radius = radius;
+		}
+
+		public Sphere( double centerX, double centerY, double centerZ, double radius )
+		{
+			Center = new Vector3( centerX, centerY, centerZ );
+			Radius = radius;
 		}
 
 		public Sphere( SphereF source )

@@ -2138,7 +2138,7 @@ namespace Internal//NeoAxis
 
 		public override void CreatedWindow_UpdateSystemCursorFileName()
 		{
-			var hCursor = GetSystemCursorByFileName( EngineApp.SystemCursorFileName );
+			var hCursor = GetSystemCursorByFileName( EngineApp.CustomCursorFileName );
 			if( hCursor == IntPtr.Zero )
 				hCursor = hCursorArrow;
 

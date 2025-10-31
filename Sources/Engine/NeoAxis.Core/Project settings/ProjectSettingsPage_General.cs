@@ -40,19 +40,20 @@ namespace NeoAxis
 		public event Action<ProjectSettingsPage_General> ProjectNameChanged;
 		ReferenceField<string> _projectName = "Example Project";
 
-		/// <summary>
-		/// The name of the world.
-		/// </summary>
-		[Category( "General" )]
-		public string CloudProjectName
-		{
-			get
-			{
-				if( EngineInfo.CloudProjectInfo != null )
-					return EngineInfo.CloudProjectInfo.Name;
-				return "";
-			}
-		}
+		//!!!!new commented
+		///// <summary>
+		///// The name of the world.
+		///// </summary>
+		//[Category( "General" )]
+		//public string CloudProjectName
+		//{
+		//	get
+		//	{
+		//		if( EngineInfo.CloudProjectInfo != null )
+		//			return EngineInfo.CloudProjectInfo.Name;
+		//		return "";
+		//	}
+		//}
 
 		/////////////////////////////////////////
 
@@ -496,17 +497,18 @@ namespace NeoAxis
 				if( /*!ExtendedMode && */ProjectSettingsComponent.HidePropertiesForSpecialAppMode.Contains( member.Name ) )
 					skip = true;
 
-				//Cloud project mode
-				if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-				{
-					if( member.Name == nameof( ProjectName ) )
-						skip = true;
-				}
-				else
-				{
-					if( member.Name == nameof( CloudProjectName ) )
-						skip = true;
-				}
+				//!!!!new commented
+				////Cloud project mode
+				//if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+				//{
+				//	if( member.Name == nameof( ProjectName ) )
+				//		skip = true;
+				//}
+				//else
+				//{
+				//	if( member.Name == nameof( CloudProjectName ) )
+				//		skip = true;
+				//}
 			}
 		}
 	}

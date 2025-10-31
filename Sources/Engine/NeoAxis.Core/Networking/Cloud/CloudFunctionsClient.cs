@@ -3,11 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading;
+using System.IO;
 
 namespace NeoAxis.Networking
 {
 	/// <summary>
-	/// A basic client to access cloud functions. Another way is using ClientNetworkService_CloudFunctions.
+	/// A basic client to access cloud functions. Another way is using ClientNetworkService_CloudFunctions inside a custom service node.
 	/// </summary>
 	public class CloudFunctionsClient : BasicServiceClient
 	{
@@ -21,6 +22,9 @@ namespace NeoAxis.Networking
 		public class CloudFunctionsNode : BasicServiceNode
 		{
 			ClientNetworkService_CloudFunctions cloudFunctions;
+			//ClientNetworkService_Messages messages;
+			ClientNetworkService_Users users;
+			ClientNetworkService_Chat chat;
 
 			//
 
@@ -28,11 +32,35 @@ namespace NeoAxis.Networking
 			{
 				cloudFunctions = new ClientNetworkService_CloudFunctions();
 				RegisterService( cloudFunctions );
+
+				//messages = new ClientNetworkService_Messages();
+				//RegisterService( messages );
+
+				users = new ClientNetworkService_Users();
+				RegisterService( users );
+
+				chat = new ClientNetworkService_Chat( users );
+				RegisterService( chat );
 			}
 
 			public ClientNetworkService_CloudFunctions CloudFunctions
 			{
 				get { return cloudFunctions; }
+			}
+
+			//public ClientNetworkService_Messages Messages
+			//{
+			//	get { return messages; }
+			//}
+
+			public ClientNetworkService_Users Users
+			{
+				get { return users; }
+			}
+
+			public ClientNetworkService_Chat Chat
+			{
+				get { return chat; }
 			}
 		}
 
@@ -46,88 +74,37 @@ namespace NeoAxis.Networking
 
 		///////////////////////////////////////////////
 
-		public class SaveStringResult
-		{
-			public string Error { get; set; }
-		}
-
-		///////////////////////////////////////////////
-
-		public class LoadStringsResult
-		{
-			public string[] Values { get; set; }
-			public string Error { get; set; }
-		}
-
-		///////////////////////////////////////////////
-
-		public class LoadStringResult
-		{
-			public string Value { get; set; }
-			public string Error { get; set; }
-		}
-
-		///////////////////////////////////////////////
-
-		public class CallMethodResult<T>
-		{
-			public T Value { get; set; }
-			public string Error { get; set; }
-		}
-
-		///////////////////////////////////////////////
-
-		public class LoadFilesInfoResult
-		{
-			public FileItem[] Items { get; set; }
-			public string Error { get; set; }
-
-			public struct FileItem
-			{
-				public string FilePath { get; set; }
-				public long Size { get; set; }
-				//!!!!
-				public string Hash { get; set; }
-			}
-		}
-
-		///////////////////////////////////////////////
-
-		public class LoadFilesResult
-		{
-			public string Error { get; set; }
-		}
-
-		///////////////////////////////////////////////
-
 		static CloudFunctionsClient()
 		{
 			instances = new List<CloudFunctionsClient>();
 		}
 
-		CloudFunctionsClient( bool autoUpdate )
-			: base( autoUpdate )
+		public CloudFunctionsClient()
 		{
 			ServiceName = "CloudFunctions";
 		}
 
-		//!!!!need?
 		public static CloudFunctionsClient[] GetInstances()
 		{
 			lock( instances )
 				return instances.ToArray();
 		}
 
-		//!!!!need?
 		public static CloudFunctionsClient FirstInstance
 		{
 			get { return firstInstance; }
 		}
 
-		public static async Task<CreateResult> CreateAsync( ConnectionSettingsClass connectionSettings, bool autoUpdate, bool connect )
+		public static async Task<CreateResult> CreateAsync( ConnectionSettingsClass connectionSettings, bool connect, CancellationToken cancellationToken = default )
 		{
-			var instance = new CloudFunctionsClient( autoUpdate );
+			var instance = (CloudFunctionsClient)connectionSettings.PreCreatedInstance;
+			if( instance == null )
+				instance = new CloudFunctionsClient();
 			instance.ConnectionSettings = connectionSettings;
+
+			//var instance = (CloudFunctionsClient)instanceType.InvokeMember( "", BindingFlags.CreateInstance, null, null, new object[] { autoUpdate } );
+			////var instance = new CloudFunctionsClient( autoUpdate );
+			//instance.ConnectionSettings = connectionSettings;
 
 			lock( instances )
 			{
@@ -137,13 +114,44 @@ namespace NeoAxis.Networking
 
 			if( connect )
 			{
-				var error = await instance.ReconnectAsync();
+				var error = await instance.ReconnectAsync( cancellationToken );
 				if( !string.IsNullOrEmpty( error ) )
 					return new CreateResult() { Error = error };
 			}
 
 			return new CreateResult() { Client = instance };
 		}
+
+		//public static async Task<CreateResult> CreateAsync<T>( ConnectionSettingsClass connectionSettings, bool autoUpdate, bool connect )
+		//{
+		//	return await CreateAsync( typeof( T ), connectionSettings, autoUpdate, connect );
+		//}
+
+		//public static async Task<CreateResult> CreateAsync( ConnectionSettingsClass connectionSettings, bool autoUpdate, bool connect )
+		//{
+		//	return await CreateAsync( new CloudFunctionsClient( autoUpdate ), connectionSettings/*, bool autoUpdate*/, connect );
+
+		//	//return await CreateAsync( typeof( CloudFunctionsClient ), connectionSettings, autoUpdate, connect );
+
+
+		//	//var instance = new CloudFunctionsClient( autoUpdate );
+		//	//instance.ConnectionSettings = connectionSettings;
+
+		//	//lock( instances )
+		//	//{
+		//	//	instances.Add( instance );
+		//	//	firstInstance = instances.Count > 0 ? instances[ 0 ] : null;
+		//	//}
+
+		//	//if( connect )
+		//	//{
+		//	//	var error = await instance.ReconnectAsync();
+		//	//	if( !string.IsNullOrEmpty( error ) )
+		//	//		return new CreateResult() { Error = error };
+		//	//}
+
+		//	//return new CreateResult() { Client = instance };
+		//}
 
 		protected override BasicServiceNode OnCreateNetworkNode()
 		{
@@ -165,7 +173,7 @@ namespace NeoAxis.Networking
 		//{
 		//	error = "";
 
-		//	zzz;//instances
+		//	instances
 
 		//	var instance = new CloudFunctions2();
 		//	//instance.connectionType = ConnectionTypeEnum.Direct;
@@ -253,7 +261,6 @@ namespace NeoAxis.Networking
 			base.OnUpdate();
 		}
 
-		//!!!!
 		//public static void UpdateAll()
 		//{
 		//	foreach( var instance in GetInstances() )
@@ -301,15 +308,14 @@ namespace NeoAxis.Networking
 				helloFromServerMessage = data;
 		}
 
-		//!!!!
 		//public static void DestroyAll()
 		//{
 		//	foreach( var instance in GetInstances() )
 		//		instance.Destroy();
 		//}
 
-		//!!!!about reconnect
-		//!!!!проверять когда было последнее сообщение. еще много где может быть проблема с накапливанием неотправленных сообщений
+
+		//about reconnect. with contenuation
 
 		//public bool Connected
 		//{
@@ -335,9 +341,9 @@ namespace NeoAxis.Networking
 		//		string password = null;
 		//		string verificationCode = null;
 
-		//		if( connectionSettings.ConnectionType == ConnectionSettingsClass.ConnectionTypeEnum.Cloudbox )
+		//		if( connectionSettings.ConnectionType == ConnectionSettingsClass.ConnectionTypeEnum.Clo_udbox )
 		//		{
-		//			//request access info from Cloudbox
+		//			//request access info from Cloud
 
 		//			//request verification code from general manager to entering server manager
 		//			var requestCodeResult = await GeneralManagerFunctions.RequestVerificationCodeToEnterProjectAsync( connectionSettings.ProjectID, "Service" );
@@ -352,9 +358,7 @@ namespace NeoAxis.Networking
 		//			//	return false;
 		//			//}
 
-
-		//			//!!!!port
-
+		//			port
 
 		//			serverAddress = requestCodeResult.Data.GetAttribute( "ServerAddress" );
 		//			serverPort = int.Parse( requestCodeResult.Data.GetAttribute( "ServerPort" ) );
@@ -409,9 +413,9 @@ namespace NeoAxis.Networking
 		//		string password = null;
 		//		string verificationCode = null;
 
-		//		if( connectionSettings.ConnectionType == ConnectionSettingsClass.ConnectionTypeEnum.Cloudbox )
+		//		if( connectionSettings.ConnectionType == ConnectionSettingsClass.ConnectionTypeEnum.Clou_dbox )
 		//		{
-		//			//request access info from Cloudbox
+		//			//request access info from Cloud
 
 		//			//request verification code from general manager to entering server manager
 		//			var requestCodeResultTask = GeneralManagerFunctions.RequestVerificationCodeToEnterProjectAsync( connectionSettings.ProjectID, "Service" );
@@ -427,9 +431,7 @@ namespace NeoAxis.Networking
 		//			//	return false;
 		//			//}
 
-
-		//			//!!!!port
-
+		//			port
 
 		//			serverAddress = requestCodeResult.Data.GetAttribute( "ServerAddress" );
 		//			serverPort = int.Parse( requestCodeResult.Data.GetAttribute( "ServerPort" ) );
@@ -472,24 +474,14 @@ namespace NeoAxis.Networking
 
 
 		///////////////////////////////////////////////
-		//SaveString, LoadString
+		//SaveStrings, LoadStrings
 
-		static SaveStringResult Convert( ClientNetworkService_CloudFunctions.SaveStringResult value )
+		public async Task<ClientNetworkService_CloudFunctions.SaveStringsResult> SaveStringsAsync( string[] keys, string[] values, CancellationToken cancellationToken = default )
 		{
-			return new SaveStringResult { Error = value.Error };
+			return await ConnectionNode.CloudFunctions.SaveStringsAsync( keys, values, cancellationToken );
 		}
 
-		static LoadStringsResult Convert( ClientNetworkService_CloudFunctions.LoadStringResult value )
-		{
-			return new LoadStringsResult { Error = value.Error, Values = value.Values };
-		}
-
-		public async Task<SaveStringResult> SaveStringsAsync( string[] keys, string[] values, CancellationToken cancellationToken = default )
-		{
-			return Convert( await ConnectionNode.CloudFunctions.SaveStringsAsync( keys, values, cancellationToken ) );
-		}
-
-		public async Task<SaveStringResult> SaveStringsAsync( ICollection<(string, string)> pairs, CancellationToken cancellationToken = default )
+		public async Task<ClientNetworkService_CloudFunctions.SaveStringsResult> SaveStringsAsync( ICollection<(string, string)> pairs, CancellationToken cancellationToken = default )
 		{
 			var keys = new string[ pairs.Count ];
 			var values = new string[ pairs.Count ];
@@ -500,72 +492,205 @@ namespace NeoAxis.Networking
 				values[ counter ] = pair.Item2;
 				counter++;
 			}
-
-			return Convert( await ConnectionNode.CloudFunctions.SaveStringsAsync( keys, values, cancellationToken ) );
+			return await ConnectionNode.CloudFunctions.SaveStringsAsync( keys, values, cancellationToken );
 		}
 
-		public async Task<SaveStringResult> SaveStringAsync( string key, string value, CancellationToken cancellationToken = default )
+		public async Task<ClientNetworkService_CloudFunctions.SaveStringsResult> SaveStringAsync( string key, string value, CancellationToken cancellationToken = default )
 		{
-			return Convert( await ConnectionNode.CloudFunctions.SaveStringsAsync( new string[] { key }, new string[] { value }, cancellationToken ) );
+			return await ConnectionNode.CloudFunctions.SaveStringsAsync( new string[] { key }, new string[] { value }, cancellationToken );
 		}
 
-		public async Task<LoadStringsResult> LoadStringsAsync( string[] keys, CancellationToken cancellationToken = default )
+		public async Task<ClientNetworkService_CloudFunctions.LoadStringsResult> LoadStringsAsync( string[] keys, CancellationToken cancellationToken = default )
 		{
-			return Convert( await ConnectionNode.CloudFunctions.LoadStringsAsync( keys, cancellationToken ) );
+			return await ConnectionNode.CloudFunctions.LoadStringsAsync( keys, cancellationToken );
 		}
 
-		public async Task<LoadStringResult> LoadStringAsync( string key, CancellationToken cancellationToken = default )
+		public async Task<ClientNetworkService_CloudFunctions.LoadStringResult> LoadStringAsync( string key, CancellationToken cancellationToken = default )
 		{
-			var result = await ConnectionNode.CloudFunctions.LoadStringsAsync( new string[] { key }, cancellationToken );
-			if( string.IsNullOrEmpty( result.Error ) )
-				return new LoadStringResult { Value = result.Values[ 0 ] };
-			else
-				return new LoadStringResult { Error = result.Error };
+			return await ConnectionNode.CloudFunctions.LoadStringAsync( key, cancellationToken );
 		}
 
+		///////////////////////////////////////////////
+		//GetCallMethodInfo
+
+		public async Task<ClientNetworkService_CloudFunctions.GetCallMethodInfoResult> GetCallMethodInfoAsync( string className, string methodName, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.GetCallMethodInfoAsync( className, methodName, cancellationToken );
+		}
+
+		///////////////////////////////////////////////
+		//GetCallMethods
+
+		public async Task<ClientNetworkService_CloudFunctions.GetCallMethodsResult> GetCallMethodsAsync( bool commandsOnly, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.GetCallMethodsAsync( commandsOnly, cancellationToken );
+		}
 
 		///////////////////////////////////////////////
 		//CallMethod
 
-		static CallMethodResult<T> Convert<T>( ClientNetworkService_CloudFunctions.CallMethodResult<T> value )
+		//with return value
+
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResult<T>> CallMethodWithCancellationTokenAsync<T>( ClientNetworkService_CloudFunctions.CallMethodInfo method, CancellationToken cancellationToken, params object[] parameters )
 		{
-			return new CallMethodResult<T> { Error = value.Error, Value = value.Value };
+			return await ConnectionNode.CloudFunctions.CallMethodWithCancellationTokenAsync<T>( method, cancellationToken, parameters );
 		}
 
-		public async Task<CallMethodResult<T>> CallMethodAsync<T>( string className, string methodName, object[] parameters, CancellationToken cancellationToken = default )
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResult<T>> CallMethodWithCancellationTokenAsync<T>( string className, string methodName, CancellationToken cancellationToken, params object[] parameters )
 		{
-			return Convert( await ConnectionNode.CloudFunctions.CallMethodAsync<T>( className, methodName, parameters, cancellationToken ) );
+			return await ConnectionNode.CloudFunctions.CallMethodWithCancellationTokenAsync<T>( className, methodName, cancellationToken, parameters );
 		}
 
-		public async Task<CallMethodResult<T>> CallMethodAsync<T>( string className, string methodName, params object[] parameters )
+		/// <summary>
+		/// Call method with default cancellation token specified in CallMethodDefaultCancellationTokenSource.
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="method"></param>
+		/// <param name="parameters"></param>
+		/// <returns></returns>
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResult<T>> CallMethodAsync<T>( ClientNetworkService_CloudFunctions.CallMethodInfo method, params object[] parameters )
 		{
-			return Convert( await ConnectionNode.CloudFunctions.CallMethodAsync<T>( className, methodName, parameters ) );
+			return await ConnectionNode.CloudFunctions.CallMethodAsync<T>( method, parameters );
 		}
 
+		//without return value
+
+		/// <summary>
+		/// Call method with default cancellation token specified in CallMethodDefaultCancellationTokenSource.
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="method"></param>
+		/// <param name="parameters"></param>
+		/// <returns></returns>
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResult<T>> CallMethodAsync<T>( string className, string methodName, params object[] parameters )
+		{
+			return await ConnectionNode.CloudFunctions.CallMethodAsync<T>( className, methodName, parameters );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResultNoValue> CallMethodWithCancellationTokenAsync( ClientNetworkService_CloudFunctions.CallMethodInfo method, CancellationToken cancellationToken, params object[] parameters )
+		{
+			return await ConnectionNode.CloudFunctions.CallMethodWithCancellationTokenAsync( method, cancellationToken, parameters );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResultNoValue> CallMethodWithCancellationTokenAsync( string className, string methodName, CancellationToken cancellationToken, params object[] parameters )
+		{
+			return await ConnectionNode.CloudFunctions.CallMethodWithCancellationTokenAsync( className, methodName, cancellationToken, parameters );
+		}
+
+		/// <summary>
+		/// Call method with default cancellation token specified in CallMethodDefaultCancellationTokenSource.
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="method"></param>
+		/// <param name="parameters"></param>
+		/// <returns></returns>
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResultNoValue> CallMethodAsync( ClientNetworkService_CloudFunctions.CallMethodInfo method, params object[] parameters )
+		{
+			return await ConnectionNode.CloudFunctions.CallMethodAsync( method, parameters );
+		}
+
+		/// <summary>
+		/// Call method with default cancellation token specified in CallMethodDefaultCancellationTokenSource.
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="method"></param>
+		/// <param name="parameters"></param>
+		/// <returns></returns>
+		public async Task<ClientNetworkService_CloudFunctions.CallMethodResultNoValue> CallMethodAsync( string className, string methodName, params object[] parameters )
+		{
+			return await ConnectionNode.CloudFunctions.CallMethodAsync( className, methodName, parameters );
+		}
 
 		///////////////////////////////////////////////
-		//SaveFile, LoadFile
+		//GetFilesInfo, GetFileInfo, GetDirectoryInfo
+		//DownloadFiles, DownloadFile, DownloadDirectory, DownloadObjectsAsync
+		//UploadFiles, UploadFile, CreateDirectory, UploadObjectsAsync
+		//DeleteFiles, DeleteFile, DeleteDirectory, DeleteObjectsAsync
 
-		//!!!!how much downloaded can be calculated by comparing already downloaded files with LoadFilesInfoResult.
-		//or add progress indicator
+		public async Task<ClientNetworkService_CloudFunctions.GetFilesInfoResult> GetFilesInfoAsync( ClientNetworkService_CloudFunctions.DataSource source, string[] filePaths, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.GetFilesInfoAsync( source, filePaths, anyData, cancellationToken );
+		}
 
-		//!!!!Save
+		public async Task<ClientNetworkService_CloudFunctions.GetFileInfoResult> GetFileInfoAsync( ClientNetworkService_CloudFunctions.DataSource source, string filePath, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.GetFileInfoAsync( source, filePath, anyData, cancellationToken );
+		}
 
-		//!!!!MaxBytesPerSecond
+		public async Task<ClientNetworkService_CloudFunctions.GetDirectoryInfoResult> GetDirectoryInfoAsync( ClientNetworkService_CloudFunctions.DataSource source, string directoryPath, string searchPattern, SearchOption searchOption, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.GetDirectoryInfoAsync( source, directoryPath, searchPattern, searchOption, anyData, cancellationToken );
+		}
 
-		//public async Task<LoadFilesInfoResult> LoadFilesInfoAsync( string[] sourceFilePaths, string anyData = null, CancellationToken cancellationToken = default )
-		//{
-		//	return Convert( await ConnectionNode.CloudFunctions.LoadFilesInfoAsync( sourceFilePaths, anyData, cancellationToken ) );
-		//}
+		///////////////////////////////////////////////
 
-		//public async Task<LoadFilesResult> LoadFilesAsync( string[] sourceFilePaths, string[] destinationFullPaths, long maxBytesPerSecond = 0, string anyData = null, CancellationToken cancellationToken = default )
-		//{
-		//	return Convert( await ConnectionNode.CloudFunctions.LoadFilesAsync( sourceFilePaths, destinationFullPaths, maxBytesPerSecond, anyData, cancellationToken ) );
-		//}
+		public async Task<ClientNetworkService_CloudFunctions.DownloadFilesResult> DownloadFilesAsync( ClientNetworkService_CloudFunctions.DataSource source, string[] sourceFilePaths, string[] targetFullPaths, bool skipDownloadIfUpToDate, string anyData = null, ClientNetworkService_CloudFunctions.DownloadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DownloadFilesAsync( source, sourceFilePaths, targetFullPaths, skipDownloadIfUpToDate, anyData, progressCallback, cancellationToken );
+		}
 
-		//public async Task<LoadFilesResult> LoadFileAsync( string sourceFilePath, string destinationFullPath, long maxBytesPerSecond = 0, string anyData = null, CancellationToken cancellationToken = default )
-		//{
-		//	return await LoadFilesAsync( new string[] { sourceFilePath }, new string[] { destinationFullPath }, maxBytesPerSecond, anyData, cancellationToken );
-		//}
+		public async Task<ClientNetworkService_CloudFunctions.DownloadFilesResult> DownloadFileAsync( ClientNetworkService_CloudFunctions.DataSource source, string sourceFilePath, string targetFullPath, bool skipDownloadIfUpToDate, string anyData = null, ClientNetworkService_CloudFunctions.DownloadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DownloadFileAsync( source, sourceFilePath, targetFullPath, skipDownloadIfUpToDate, anyData, progressCallback, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.DownloadDirectoryResult> DownloadDirectoryAsync( ClientNetworkService_CloudFunctions.DataSource source, string sourceDirectoryPath, string targetFullPath, string searchPattern, SearchOption searchOption, bool skipDownloadIfUpToDate, bool deleteExcessEntries, string anyData = null, ClientNetworkService_CloudFunctions.DownloadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DownloadDirectoryAsync( source, sourceDirectoryPath, targetFullPath, searchPattern, searchOption, skipDownloadIfUpToDate, deleteExcessEntries, anyData, progressCallback, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.DownloadDirectoryResult> DownloadObjectsAsync( ClientNetworkService_CloudFunctions.DataSource source, ClientNetworkService_CloudFunctions.DownloadObjectsItem[] objects, string[] targetFullPaths, bool skipDownloadIfUpToDate, bool deleteExcessEntries, string anyData = null, ClientNetworkService_CloudFunctions.DownloadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DownloadObjectsAsync( source, objects, targetFullPaths, skipDownloadIfUpToDate, deleteExcessEntries, anyData, progressCallback, cancellationToken );
+		}
+
+		///////////////////////////////////////////////
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> UploadFilesAsync( ClientNetworkService_CloudFunctions.DataSource source, string[] sourceFullPaths, string[] targetFilePaths, string anyData = null, ClientNetworkService_CloudFunctions.UploadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.UploadFilesAsync( source, sourceFullPaths, targetFilePaths, anyData, progressCallback, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> UploadFileAsync( ClientNetworkService_CloudFunctions.DataSource source, string sourceFullPath, string targetFilePath, string anyData = null, ClientNetworkService_CloudFunctions.UploadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.UploadFileAsync( source, sourceFullPath, targetFilePath, anyData, progressCallback, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> UploadDirectoryAsync( ClientNetworkService_CloudFunctions.DataSource source, string sourceFullPath, string targetDirectoryName, SearchOption searchOption, string anyData = null, ClientNetworkService_CloudFunctions.UploadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.UploadDirectoryAsync( source, sourceFullPath, targetDirectoryName, searchOption, anyData, progressCallback, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> CreateDirectoryAsync( ClientNetworkService_CloudFunctions.DataSource source, string directoryPath, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.CreateDirectoryAsync( source, directoryPath, anyData, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> UploadObjectsAsync( ClientNetworkService_CloudFunctions.DataSource source, string[] sourceFullPaths, string[] targetFilePaths, SearchOption searchOption, string anyData = null, ClientNetworkService_CloudFunctions.UploadFilesProgressCallback progressCallback = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.UploadObjectsAsync( source, sourceFullPaths, targetFilePaths, searchOption, anyData, progressCallback, cancellationToken );
+		}
+
+		///////////////////////////////////////////////
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> DeleteFilesAsync( ClientNetworkService_CloudFunctions.DataSource source, string[] filePaths, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DeleteFilesAsync( source, filePaths, anyData, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> DeleteFileAsync( ClientNetworkService_CloudFunctions.DataSource source, string filePath, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DeleteFileAsync( source, filePath, anyData, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> DeleteDirectoryAsync( ClientNetworkService_CloudFunctions.DataSource source, string directoryPath, bool recursive, bool clear, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DeleteDirectoryAsync( source, directoryPath, recursive, clear, anyData, cancellationToken );
+		}
+
+		public async Task<ClientNetworkService_CloudFunctions.SimpleResult> DeleteObjectsAsync( ClientNetworkService_CloudFunctions.DataSource source, ClientNetworkService_CloudFunctions.DeleteObjectsItem[] objects, string anyData = null, CancellationToken cancellationToken = default )
+		{
+			return await ConnectionNode.CloudFunctions.DeleteObjectsAsync( source, objects, anyData, cancellationToken );
+		}
 	}
 }

@@ -14,12 +14,53 @@ namespace NeoAxis
 	/// </summary>
 	public class UIContextMenu : UIControl
 	{
+		/// <summary>
+		/// The height of the item.
+		/// </summary>
+		[DefaultValue( "Screen 0.022" )]
+		public Reference<UIMeasureValueDouble> ItemSize
+		{
+			get { if( _itemSize.BeginGet() ) ItemSize = _itemSize.Get( this ); return _itemSize.value; }
+			set { if( _itemSize.BeginSet( this, ref value ) ) { try { ItemSizeChanged?.Invoke( this ); } finally { _itemSize.EndSet(); } } }
+		}
+		public event Action<UIContextMenu> ItemSizeChanged;
+		ReferenceField<UIMeasureValueDouble> _itemSize = new UIMeasureValueDouble( UIMeasure.Screen, 0.022 );
+
+		/// <summary>
+		/// The margin of the item.
+		/// </summary>
+		[DefaultValue( "Parent 0 0" )]
+		[Category( "Layout" )]
+		public Reference<UIMeasureValueVector2> ItemMargin
+		{
+			get { if( _itemMargin.BeginGet() ) ItemMargin = _itemMargin.Get( this ); return _itemMargin.value; }
+			set { if( _itemMargin.BeginSet( this, ref value ) ) { try { ItemMarginChanged?.Invoke( this ); } finally { _itemMargin.EndSet(); } } }
+		}
+		public event Action<UIControl> ItemMarginChanged;
+		ReferenceField<UIMeasureValueVector2> _itemMargin;
+
+		/// <summary>
+		/// The font size of the text.
+		/// </summary>
+		[DefaultValue( "Units 20" )]
+		public Reference<UIMeasureValueDouble> ItemFontSize
+		{
+			get { if( _itemFontSize.BeginGet() ) ItemFontSize = _itemFontSize.Get( this ); return _itemFontSize.value; }
+			set { if( _itemFontSize.BeginSet( this, ref value ) ) { try { ItemFontSizeChanged?.Invoke( this ); } finally { _itemFontSize.EndSet(); } } }
+		}
+		/// <summary>Occurs when the <see cref="TitleBarFontSize"/> property value changes.</summary>
+		public event Action<UIContextMenu> ItemFontSizeChanged;
+		ReferenceField<UIMeasureValueDouble> _itemFontSize = new UIMeasureValueDouble( UIMeasure.Units, 20 );
+
+		//
+
 		[Browsable( false )]
 		public List<ItemBase> Items
 		{
 			get { return items; }
+			set { items = value; }
 		}
-		List<ItemBase> items;
+		List<ItemBase> items = new List<ItemBase>();
 
 		[Browsable( false )]
 		public Vector2 InitialScreenPosition
@@ -39,6 +80,7 @@ namespace NeoAxis
 		public class Item : ItemBase
 		{
 			public delegate void ClickDelegate( UIContextMenu sender, Item item );
+			//!!!!
 			public /*event*/ ClickDelegate Click;
 
 			//
@@ -102,7 +144,7 @@ namespace NeoAxis
 		{
 		}
 
-		public static UIContextMenu Show( UIControl parent, ICollection<ItemBase> items, Vector2 screenPosition )
+		public void Show( UIControl parent, Vector2 screenPosition )
 		{
 			//control to process mouse down outside context menu
 			var backControl = parent.CreateComponent<UIControl>( enabled: false );
@@ -110,40 +152,42 @@ namespace NeoAxis
 			backControl.Size = new UIMeasureValueVector2( UIMeasure.Screen, 1, 1 );
 			backControl.CoverOtherControls = CoverOtherControlsEnum.AllPreviousInHierarchy;
 			backControl.MouseDown += BackControl_MouseDown;
+			backControl.TopMost = true;
 
 			//updating margins, sizes in the style classes
 
-			var menu = backControl.CreateComponent<UIContextMenu>();
-			menu.items = new List<ItemBase>( items );
-			menu.initialScreenPosition = screenPosition;
+			backControl.AddComponent( this );
+			initialScreenPosition = screenPosition;
+
+			//TopMost = true;
 
 			foreach( var itemBase in items )
 			{
 				var item = itemBase as Item;
 				if( item != null )
 				{
-					var button = menu.CreateComponent<UIButton>();
+					var button = CreateComponent<UIButton>();
 					button.Text = item.Text;
 					button.ReadOnly = !item.Enabled;
 					button.AnyData = item;
+					button.FontSize = ItemFontSize;
 
 					button.Click += delegate ( UIButton sender )
 					{
 						var item2 = (Item)sender.AnyData;
-						item2.Click?.Invoke( menu, item2 );
+						item2.Click?.Invoke( this, item2 );
 
-						menu.Parent.RemoveFromParent( true );
+						Parent.RemoveFromParent( true );
 					};
 				}
 			}
 
 			backControl.Enabled = true;
-			return menu;
 		}
 
-		public static UIContextMenu Show( UIControl parent, ICollection<ItemBase> items )
+		public void Show( UIControl parent )
 		{
-			return Show( parent, items, parent.ConvertLocalToScreen( parent.MousePosition ) );
+			Show( parent, parent.ConvertLocalToScreen( parent.MousePosition ) );
 		}
 
 		private static void BackControl_MouseDown( UIControl sender, EMouseButtons button, ref bool handled )
@@ -168,6 +212,5 @@ namespace NeoAxis
 
 			return base.OnKeyDown( e );
 		}
-
 	}
 }

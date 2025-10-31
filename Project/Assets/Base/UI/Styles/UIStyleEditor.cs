@@ -119,9 +119,9 @@ namespace Project
 			base.OnRenderList( control, renderer );
 		}
 
-		public override int GetListItemIndexByScreenPosition( UIList control, Vector2 position )
+		public override int GetListItemIndexByScreenPosition( UIList control, Vector2 position, ref bool overCheckbox )
 		{
-			return base.GetListItemIndexByScreenPosition( control, position );
+			return base.GetListItemIndexByScreenPosition( control, position, ref overCheckbox );
 		}
 
 		/////////////////////////////////////////

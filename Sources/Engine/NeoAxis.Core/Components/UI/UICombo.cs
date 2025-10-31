@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.ComponentModel;
+using System.Linq;
 
 namespace NeoAxis
 {
@@ -12,9 +13,10 @@ namespace NeoAxis
 	/// </summary>
 	public class UICombo : UIControl
 	{
+		List<ItemData> items = new List<ItemData>();
 		bool disableListSelectedIndexChangedEvent;
-
 		double remainingTimeToClose;
+		object getAddItemsLock = new object();
 
 		/////////////////////////////////////////
 
@@ -44,13 +46,22 @@ namespace NeoAxis
 		public event Action<UICombo> TextWhenNoSelectedItemsChanged;
 		ReferenceField<string> _textWhenNoSelectedItems = "";
 
-		//!!!!string? но нужен редактор
 		/// <summary>
 		/// The list of items.
 		/// </summary>
+		[Cloneable( CloneType.Deep )]
+		public IReadOnlyList<ItemData> Items
+		{
+			get { return items; }
+		}
+
+		/// <summary>
+		/// The list of items specified as text. Used in editor.
+		/// </summary>
 		[Serialize]
 		[Cloneable( CloneType.Deep )]
-		public List<string> Items { get; set; } = new List<string>();
+		[Browsable( true )]
+		public List<string> ItemsAsText { get; set; } = new List<string>();
 
 		/// <summary>
 		/// The index of the selected item.
@@ -74,20 +85,32 @@ namespace NeoAxis
 		public event SelectedIndexChangedDelegate SelectedIndexChanged;
 
 		/// <summary>
-		/// The selected item.
+		/// Get the selected item.
 		/// </summary>
 		[Browsable( false )]
-		public string SelectedItem
+		public ItemData SelectedItem
 		{
 			get
 			{
-				if( SelectedIndex >= 0 && SelectedIndex < Items.Count )
-					return Items[ SelectedIndex ];
+				try
+				{
+					if( SelectedIndex >= 0 && SelectedIndex < Items.Count )
+						return items[ SelectedIndex ];
+				}
+				catch { }
 				return null;
 			}
 		}
 
-		/////////////////////////////////////////
+		///////////////////////////////////////////////
+
+		public class ItemData
+		{
+			public object Value;
+			public object Tag;
+		}
+
+		///////////////////////////////////////////////
 
 		public UICombo()
 		{
@@ -449,7 +472,7 @@ namespace NeoAxis
 		{
 			get
 			{
-				var text = SelectedItem;
+				var text = SelectedItem?.Value.ToString();
 				if( text == null )
 					text = TextWhenNoSelectedItems;
 				return text;
@@ -503,7 +526,13 @@ namespace NeoAxis
 				disableListSelectedIndexChangedEvent = true;
 				try
 				{
-					list.Items = new List<string>( Items );
+					if( !Items.Select( i => i.Value.ToString() ).SequenceEqual( list.Items.Select( i => i.Value.ToString() ) ) )
+					{
+						list.ClearItems();
+						foreach( var item in Items )
+							list.AddItem( item.Value.ToString() );
+					}
+
 					list.SelectedIndex = SelectedIndex;
 				}
 				finally
@@ -653,11 +682,11 @@ namespace NeoAxis
 		//	return base.OnMouseDown( button );
 		//}
 
-		public int SelectItem( string text )
+		public int SelectItem( object value )
 		{
 			for( int n = 0; n < Items.Count; n++ )
 			{
-				if( Items[ n ] == text )
+				if( Items[ n ].Value == value )
 				{
 					SelectedIndex = n;
 					return n;
@@ -666,5 +695,63 @@ namespace NeoAxis
 			return -1;
 		}
 
+		public ItemData GetItem( int index )
+		{
+			try
+			{
+				if( index >= 0 && index < Items.Count )
+					return items[ index ];
+			}
+			catch { }
+			return null;
+		}
+
+		public void ClearItems()
+		{
+			lock( getAddItemsLock )
+				items.Clear();
+		}
+
+		public int AddItem( object value, object tag = null )
+		{
+			lock( getAddItemsLock )
+			{
+				var item = new ItemData { Value = value, Tag = tag };
+				items.Add( item );
+				return Items.Count - 1;
+			}
+		}
+
+		public void InsertItem( int index, object value, object tag = null )
+		{
+			lock( getAddItemsLock )
+			{
+				var item = new ItemData { Value = value, Tag = tag };
+				items.Insert( index, item );
+			}
+		}
+
+		public void RemoveItem( int index )
+		{
+			lock( getAddItemsLock )
+			{
+				try
+				{
+					items.RemoveAt( index );
+				}
+				catch { }
+			}
+		}
+
+		protected override void OnEnabledInSimulation()
+		{
+			base.OnEnabledInSimulation();
+
+			if( ItemsAsText.Count != 0 && Items.Count == 0 )
+			{
+				foreach( var s in ItemsAsText )
+					AddItem( s );
+			}
+		}
 	}
 }

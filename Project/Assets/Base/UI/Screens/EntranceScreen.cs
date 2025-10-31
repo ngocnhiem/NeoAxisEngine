@@ -31,8 +31,9 @@ namespace Project
 			base.OnEnabledInSimulation();
 
 			var worldName = ProjectSettings.Get.General.ProjectName;
-			if( EngineInfo.CloudProjectInfo != null )
-				worldName = EngineInfo.CloudProjectInfo.Name;
+			//!!!!new commented
+			//if( EngineInfo.CloudProjectInfo != null )
+			//	worldName = EngineInfo.CloudProjectInfo.Name;
 			GetTextWelcome().Text = GetTextWelcome().Text.Value.Replace( "{name}", worldName );
 
 			UpdateDescriptionAndStatus();
@@ -123,8 +124,9 @@ namespace Project
 			var networkLogic = GetNetworkLogic();
 			if( networkLogic != null )
 			{
-				networkLogic.BeginNetworkMessageToServer( "TryEnterToWorld" );
-				networkLogic.EndNetworkMessage();
+				var m = networkLogic.BeginNetworkMessageToServer( "TryEnterToWorld" );
+				if( m != null )
+					m.End();
 			}
 		}
 
@@ -170,8 +172,9 @@ namespace Project
 			var clientLogic = GetNetworkLogic();
 			if( clientLogic != null )
 			{
-				clientLogic.BeginNetworkMessageToServer( "RequestEntranceScreenInfo" );
-				clientLogic.EndNetworkMessage();
+				var m = clientLogic.BeginNetworkMessageToServer( "RequestEntranceScreenInfo" );
+				if( m != null )
+					m.End();
 			}
 		}
 	}

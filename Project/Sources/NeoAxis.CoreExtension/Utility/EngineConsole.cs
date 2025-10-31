@@ -1,4 +1,5 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
+using NeoAxis.Networking;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -470,7 +471,7 @@ namespace NeoAxis
 									currentString += c.ToString();
 									pos++;
 								}
-								end:;
+end:;
 							}
 						}
 						else
@@ -912,6 +913,74 @@ namespace NeoAxis
 			}
 		}
 
+		static void Connections( string arguments )
+		{
+			try
+			{
+				var serverNodes = ServerNode.GetInstances();
+				foreach( var serverNode in serverNodes )
+				{
+					Log.Info( "-------------------------------------------------------------------------------" );
+					Print( "Server node" );
+					Print( $"Name: {serverNode.ServerName}" );
+					Print( $"Clients: {serverNode.ClientCount}" );
+
+					var users = serverNode.GetService<ServerNetworkService_Users>();
+					if( users != null )
+					{
+						Print( "Users: " + users.Users.Count.ToString() );
+
+						var u = "";
+						foreach( var user in users.Users )
+						{
+							if( u != "" )
+								u += ", ";
+							u += user.Username;
+						}
+						Print( "User list: " + u );
+					}
+				}
+
+				var clientNodes = ClientNode.GetInstances();
+				foreach( var clientNode in clientNodes )
+				{
+					Log.Info( "-------------------------------------------------------------------------------" );
+					Print( "Client node" );
+					Print( $"Connected to: {clientNode.ClientConnectHost}:{clientNode.ClientConnectPort}" );
+					//Print( $"Connected to: {clientNode.Client.Url.Host}:{clientNode.Client.Url.Port}" );
+					Print( "Network node class: " + clientNode.GetType().FullName );
+
+					var s = "";
+					foreach( var service in clientNode.Services )
+					{
+						if( s != "" )
+							s += ", ";
+						s += service.Name;
+					}
+					Print( "Services: " + s );
+
+					var users = clientNode.GetService<ClientNetworkService_Users>();
+					if( users != null )
+					{
+						Print( "Users: " + users.Users.Count.ToString() );
+
+						var u = "";
+						foreach( var user in users.Users )
+						{
+							if( u != "" )
+								u += ", ";
+							u += user.Username;
+						}
+						Print( "User list: " + u );
+					}
+				}
+			}
+			catch( Exception ex )
+			{
+				Log.Warning( ex.Message );
+			}
+		}
+
 		static void AddStandardCommands()
 		{
 			AddCommand( "Quit", ConsoleQuit );
@@ -924,6 +993,7 @@ namespace NeoAxis
 			AddCommand( "EngineTimeScale", ConsoleEngineTimeScale );
 			AddCommand( "SoundPitchScale", ConsoleSoundPitchScale );
 			AddCommand( "DebugInfo", ConsoleDebugInfo );
+			AddCommand( "Connections", Connections, "Get info about network connections." );
 		}
 	}
 }

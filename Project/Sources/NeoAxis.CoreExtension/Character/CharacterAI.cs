@@ -891,9 +891,12 @@ namespace NeoAxis
 				if( NetworkIsClient )
 				{
 					//var writer = 
-					BeginNetworkMessageToServer( "ObjectInteractionInputMessage_InteractByClick" );
-					//writer.Write( (byte)buttonDown.Button );
-					EndNetworkMessage();
+					var m = BeginNetworkMessageToServer( "ObjectInteractionInputMessage_InteractByClick" );
+					if( m != null )
+					{
+						//writer.Write( (byte)buttonDown.Button );
+						m.End();
+					}
 				}
 				else
 				{

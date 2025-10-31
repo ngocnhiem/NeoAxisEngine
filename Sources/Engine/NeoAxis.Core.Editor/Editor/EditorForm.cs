@@ -355,14 +355,14 @@ namespace NeoAxis.Editor
 
 			UpdateRecentProjectsInRegistry();
 
-#if CLOUD
-			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-			{
-				RepositoryServerState.Init( VirtualFileSystem.Directories.AllFiles );
-				RepositoryLocal.Init( VirtualFileSystem.Directories.AllFiles );
-				RepositoryIconCache.Init( VirtualFileSystem.Directories.AllFiles, null );
-			}
-#endif
+			//#if CLOUD
+			//			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+			//			{
+			//				RepositoryServerState.Init( VirtualFileSystem.Directories.AllFiles );
+			//				RepositoryLocal.Init( VirtualFileSystem.Directories.AllFiles );
+			//				RepositoryIconCache.Init( VirtualFileSystem.Directories.AllFiles, null );
+			//			}
+			//#endif
 
 			LoginUtility.RequestFullLicenseInfo();
 
@@ -483,10 +483,10 @@ namespace NeoAxis.Editor
 
 			EditorAPI.ClosingApplication = true;
 
-#if CLOUD
-			CloudProjectEnteringClient.AppDestroy();
-			CloudProjectCommitClient.AppDestroy();
-#endif
+			//#if CLOUD
+			//			CloudProjectEnteringClient.AppDestroy();
+			//			CloudProjectCommitClient.AppDestroy();
+			//#endif
 
 			EditorLocalization2.Shutdown();
 
@@ -507,10 +507,10 @@ namespace NeoAxis.Editor
 
 			EditorUtility2.PurgeCachedImages();
 
-#if CLOUD
-			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-				RepositoryIconCache.Shutdown();
-#endif
+			//#if CLOUD
+			//			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+			//				RepositoryIconCache.Shutdown();
+			//#endif
 
 			if( !canSaveConfig )
 				EngineApp.NeedSaveConfig = false;
@@ -630,15 +630,14 @@ namespace NeoAxis.Editor
 			var c = ProjectSettings.Get;//.GetComponent<ProjectSettings_General>();
 			if( c != null )
 			{
-				if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-					projectName = c.General.CloudProjectName.Trim();
-				else
-					projectName = c.General.ProjectName.Value.Trim();
+				//!!!!new commented
+				//if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+				//	projectName = c.General.CloudProjectName.Trim();
+				//else
+				projectName = c.General.ProjectName.Value.Trim();
 			}
 
 			var postFix = "";// " " + ( EngineApp.IsProPlan ? "Pro" : "Personal" );
-							 //if( EngineInfo.ExtendedEdition )
-							 //	postFix += " " + EditorLocalization.Translate( "General", "Extended" );
 
 			if( projectName != "" )
 				Text = projectName + " - " + EngineInfo.NameWithVersion + postFix;
@@ -793,10 +792,10 @@ namespace NeoAxis.Editor
 					EditorAPI2.ShowProjectSettings();
 				}
 
-#if CLOUD
-				CloudProjectEnteringClient.Update();
-				CloudProjectCommitClient.Update();
-#endif
+				//#if CLOUD
+				//				CloudProjectEnteringClient.Update();
+				//				CloudProjectCommitClient.Update();
+				//#endif
 
 				canSaveConfig = true;
 			}

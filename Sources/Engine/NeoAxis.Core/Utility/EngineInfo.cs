@@ -1,7 +1,6 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
 using System;
 using System.Reflection;
-using System.Drawing;
 
 namespace NeoAxis
 {
@@ -47,14 +46,7 @@ namespace NeoAxis
 			{
 				if( !string.IsNullOrEmpty( ReplaceNameWithoutVersion ) )
 					return ReplaceNameWithoutVersion;
-
 				return OriginalName;
-
-				//var result = "";
-				////if( ModifiedVersionOfNeoAxisEngine )
-				////	result += "Modified version of ";
-				//result += OriginalName;
-				//return result;
 			}
 		}
 
@@ -67,9 +59,6 @@ namespace NeoAxis
 
 				Version v = Assembly.GetExecutingAssembly().GetName().Version;
 				var result = NameWithoutVersion + $" {v.Major}.{v.Minor}";
-				//if( OriginalName == "NeoAxis Engine" )//if( !SpecialAppMode )
-				//	result += $" ({WWW})";
-
 				return result;
 			}
 		}
@@ -85,55 +74,56 @@ namespace NeoAxis
 		public static string ReplaceNameWithoutVersion { get; set; } = "";
 		public static string ReplaceNameWithVersion { get; set; } = "";
 
-		//public static bool ExtendedEdition;
+		public static string StoreAddress { get; set; } = "https://store.neoaxis.com";
 
-		public static string StoreAddress
-		{
-			get { return "https://store.neoaxis.com"; }
-		}
+		public static string CloudServiceName { get; set; } = "NeoX";
 
 		/////////////////////////////////////////
 
-		public enum EngineModeEnum
-		{
-			Standalone,
-			CloudServer,
-			CloudClient,
-		}
+		//!!!!new commented
+		//public enum EngineModeEnum
+		//{
+		//	Standalone,
+		//	CloudServer,
+		//	CloudClient,
+		//}
 
 		/////////////////////////////////////////
 
-		public class CloudProjectInfoClass
-		{
-			public long ID { get; }
-			public string Name { get; }
+		//!!!!new commented
+		//public class CloudProjectInfoClass
+		//{
+		//	public long ID { get; }
+		//	public string Name { get; }
 
-			internal CloudProjectInfoClass( long id, string name )
-			{
-				ID = id;
-				Name = name;
-			}
-		}
+		//	internal CloudProjectInfoClass( long id, string name )
+		//	{
+		//		ID = id;
+		//		Name = name;
+		//	}
+		//}
 
 		/////////////////////////////////////////
 
-		static EngineModeEnum engineMode;
-		static CloudProjectInfoClass cloudProjectInfo;
+		//!!!!new commented
 
-		public static void SetEngineMode( EngineModeEnum engineMode, CloudProjectInfoClass cloudProjectInfo )
-		{
-			EngineInfo.engineMode = engineMode;
-			EngineInfo.cloudProjectInfo = cloudProjectInfo;
-		}
+		//static EngineModeEnum engineMode;
+		//static CloudProjectInfoClass cloudProjectInfo;
 
-		public static CloudProjectInfoClass CloudProjectInfo
-		{
-			get { return cloudProjectInfo; }
-		}
+		//public static void SetEngineMode( EngineModeEnum engineMode, CloudProjectInfoClass cloudProjectInfo )
+		//{
+		//	EngineInfo.engineMode = engineMode;
+		//	EngineInfo.cloudProjectInfo = cloudProjectInfo;
+		//}
 
-		public static EngineModeEnum EngineMode
-		{
-			get { return engineMode; }
-		}
+		//public static CloudProjectInfoClass CloudProjectInfo
+		//{
+		//	get { return cloudProjectInfo; }
+		//}
+
+		//public static EngineModeEnum EngineMode
+		//{
+		//	get { return engineMode; }
+		//}
 	}
 }

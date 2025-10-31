@@ -188,13 +188,14 @@ namespace NeoAxis
 					//	networkSentRun = run;
 					//	networkSentLookDirection = lookDirection;
 
-					var writer = BeginNetworkMessageToServer( "UpdateObjectControlCharacter2D" );
-					if( writer != null )
+					var m = BeginNetworkMessageToServer( "UpdateObjectControlCharacter2D" );
+					if( m != null )
 					{
+						var writer = m.Writer;
 						writer.Write( new HalfType( vector ) );
 						writer.Write( run );
 						writer.Write( lookDirection.ToVector2H() );
-						EndNetworkMessage();
+						m.End();
 					}
 					//}
 				}

@@ -6712,37 +6712,43 @@ toSkip:
 				//!!!!частичное обновление
 
 				{
-					var writer = client != null ? BeginNetworkMessage( client, "HeightmapBuffer" ) : BeginNetworkMessageToEveryone( "HeightmapBuffer" );
+					var m = client != null ? BeginNetworkMessage( client, "HeightmapBuffer" ) : BeginNetworkMessageToEveryone( "HeightmapBuffer" );
+					if( m != null )
+					{
+						var byteArray = HeightmapToByteArray( HeightmapBuffer );
+						var zipped = IOUtility.Zip( byteArray, System.IO.Compression.CompressionLevel.Fastest );
 
-					var byteArray = HeightmapToByteArray( HeightmapBuffer );
-					var zipped = IOUtility.Zip( byteArray, System.IO.Compression.CompressionLevel.Fastest );
+						m.Writer.Write( zipped.Length );
+						m.Writer.Write( zipped );
 
-					writer.Write( zipped.Length );
-					writer.Write( zipped );
-
-					EndNetworkMessage();
+						m.End();
+					}
 				}
 
 				unsafe
 				{
-					var writer = client != null ? BeginNetworkMessage( client, "HolesCache" ) : BeginNetworkMessageToEveryone( "HolesCache" );
-
-					writer.WriteVariableInt32( holesCache.Count );
-
-					foreach( var item in holesCache )
+					var m = client != null ? BeginNetworkMessage( client, "HolesCache" ) : BeginNetworkMessageToEveryone( "HolesCache" );
+					if( m != null )
 					{
-						writer.Write( item.Key );
+						var writer = m.Writer;
 
-						writer.Write( item.Value.vertices.Length );
-						fixed( Vector3* pVertices = item.Value.vertices )
-							writer.Write( pVertices, item.Value.vertices.Length * sizeof( Vector3 ) );
+						writer.WriteVariableInt32( holesCache.Count );
 
-						writer.Write( item.Value.indices.Length );
-						fixed( int* pIndices = item.Value.indices )
-							writer.Write( pIndices, item.Value.indices.Length * sizeof( int ) );
+						foreach( var item in holesCache )
+						{
+							writer.Write( item.Key );
+
+							writer.Write( item.Value.vertices.Length );
+							fixed( Vector3* pVertices = item.Value.vertices )
+								writer.Write( pVertices, item.Value.vertices.Length * sizeof( Vector3 ) );
+
+							writer.Write( item.Value.indices.Length );
+							fixed( int* pIndices = item.Value.indices )
+								writer.Write( pIndices, item.Value.indices.Length * sizeof( int ) );
+						}
+
+						m.End();
 					}
-
-					EndNetworkMessage();
 				}
 			}
 		}

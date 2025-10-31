@@ -191,16 +191,17 @@ namespace NeoAxis
 		}
 		ProjectSettingsPage_Rendering rendering;
 
-		[Browsable( false )]
-		public ProjectSettingsPage_Repository Repository
-		{
-			get
-			{
-				if( repository == null )
-					repository = GetComponent<ProjectSettingsPage_Repository>();
-				return repository ?? new ProjectSettingsPage_Repository();
-			}
-		}
-		ProjectSettingsPage_Repository repository;
+		//!!!!new commented
+		//[Browsable( false )]
+		//public ProjectSettingsPage_Repository Repository
+		//{
+		//	get
+		//	{
+		//		if( repository == null )
+		//			repository = GetComponent<ProjectSettingsPage_Repository>();
+		//		return repository ?? new ProjectSettingsPage_Repository();
+		//	}
+		//}
+		//ProjectSettingsPage_Repository repository;
 	}
 }

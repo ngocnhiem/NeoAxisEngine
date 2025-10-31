@@ -967,400 +967,400 @@ namespace NeoAxis.Editor
 					//}
 
 
-#if CLOUD
-					if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-					{
-						List<string> selectedFilesWithInsideSelectedFolders;
-						{
-							var selectedFilesSet = new ESet<string>();
-
-							foreach( var item in SelectedItems )
-							{
-								var fileItem2 = item as ContentBrowserItem_File;
-								if( fileItem2 != null )
-								{
-									//!!!!какие отсечь?
-
-									if( fileItem2.IsDirectory )
-									{
-										try
-										{
-											foreach( var fullPath in Directory.GetFiles( fileItem2.FullPath, "*", SearchOption.AllDirectories ) )
-											{
-												var fileName = VirtualPathUtility.GetAllFilesPathByReal( fullPath );
-												if( !string.IsNullOrEmpty( fileName ) )
-													selectedFilesSet.AddWithCheckAlreadyContained( fileName );
-											}
-										}
-										catch { }
-									}
-									else
-									{
-										var fileName = VirtualPathUtility.GetAllFilesPathByReal( fileItem2.FullPath );
-										if( !string.IsNullOrEmpty( fileName ) )
-											selectedFilesSet.AddWithCheckAlreadyContained( fileName );
-									}
-								}
-							}
-
-							selectedFilesWithInsideSelectedFolders = new List<string>( selectedFilesSet );
-							CollectionUtility.MergeSort( selectedFilesWithInsideSelectedFolders, delegate ( string f1, string f2 )
-							{
-								return string.Compare( f1 + " ", f2 + " ", false );
-							}, true );
-						}
-
-						var selectedFullPathFolders = new List<string>();
-						var selectedFullPathFiles = new List<string>();
-						{
-							foreach( var item in SelectedItems )
-							{
-								var fileItem2 = item as ContentBrowserItem_File;
-								if( fileItem2 != null )
-								{
-									if( fileItem2.IsDirectory )
-										selectedFullPathFolders.Add( fileItem2.FullPath );
-									else
-										selectedFullPathFiles.Add( fileItem2.FullPath );
-								}
-							}
-						}
-
-
-						var itemWorld = new KryptonContextMenuItem( Translate( "Repository" ), EditorResourcesCache.Database, null );
-
-						var items2 = new List<KryptonContextMenuItemBase>();
-
-						//Get
-						{
-							var item = new KryptonContextMenuItem( Translate( "Get Selected" ), EditorResourcesCache.MoveDown,
-								delegate ( object s, EventArgs e2 )
-								{
-									RepositoryActionsWithServer.Get( selectedFullPathFolders, selectedFullPathFiles, EngineInfo.CloudProjectInfo.ID, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
-								} );
-							item.Enabled = selectedFullPathFolders.Count != 0 || selectedFullPathFiles.Count != 0;
-							items2.Add( item );
-						}
-
-						//Commit
-						{
-							var item = new KryptonContextMenuItem( Translate( "Commit Selected" ), EditorResourcesCache.MoveUp,
-							   delegate ( object s, EventArgs e2 )
-							   {
-								   RepositoryActionsWithServer.Commit( selectedFullPathFolders, selectedFullPathFiles, EngineInfo.CloudProjectInfo.ID, true, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
-							   } );
-							item.Enabled = selectedFullPathFolders.Count != 0 || selectedFullPathFiles.Count != 0;
-							items2.Add( item );
-						}
-
-						//separator
-						items2.Add( new KryptonContextMenuSeparator() );
-
-						//Add
-						{
-							void Add( RepositorySyncMode mode )
-							{
-								var formItems = new List<RepositoryItemsForm.Item>();
-
-								foreach( var fileName in selectedFilesWithInsideSelectedFolders )
-								{
-									var formItem = new RepositoryItemsForm.Item();
-									formItem.FileName = fileName;
-									formItems.Add( formItem );
-								}
-
-								var form = new RepositoryItemsForm( "Add Files", "Select files to add:", formItems.ToArray(), true );
-								if( form.ShowDialog() != DialogResult.OK )
-									return;
-
-								var checkedFormItems = form.GetCheckedItems();
-								RepositoryLocal.Add( checkedFormItems.Select( i => i.FileName ).ToArray(), mode );
-
-								EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
-							}
-
-							var itemAdd = new KryptonContextMenuItem( Translate( "Add" ), null );
-							var items3 = new List<KryptonContextMenuItemBase>();
-
-							{
-								var item = new KryptonContextMenuItem( Translate( "Default sync mode" ), EditorResourcesCache.Synchronize,
-									delegate ( object s, EventArgs e2 )
-									{
-										Add( RepositorySyncMode.Synchronize );
-									} );
-								items3.Add( item );
-							}
-
-							items3.Add( new KryptonContextMenuSeparator() );
-
-							{
-								var item = new KryptonContextMenuItem( Translate( "Sync with Clients" ), EditorResourcesCache.Synchronize,
-									delegate ( object s, EventArgs e2 )
-									{
-										Add( RepositorySyncMode.Synchronize );
-									} );
-								items3.Add( item );
-							}
-
-							{
-								var item = new KryptonContextMenuItem( Translate( "Server Only" ), EditorResourcesCache.ServerOnly,
-									delegate ( object s, EventArgs e2 )
-									{
-										Add( RepositorySyncMode.ServerOnly );
-									} );
-								items3.Add( item );
-							}
-
-							itemAdd.Items.Add( new KryptonContextMenuItems( items3.ToArray() ) );
-							itemAdd.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) == null && !RepositoryLocal.FileItemExists( fileName ) );
-							//itemAdd.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
-							items2.Add( itemAdd );
-
-							//var item = new KryptonContextMenuItem( Translate( "Add" ), EditorResourcesCache.Add,
-							//	delegate ( object s, EventArgs e2 )
-							//	{
-							//		var formItems = new List<RepositoryItemsForm.Item>();
-
-							//		foreach( var fileName in selectedFilesWithInsideSelectedFolders )
-							//		{
-							//			var formItem = new RepositoryItemsForm.Item();
-							//			formItem.FileName = fileName;
-							//			formItems.Add( formItem );
-							//		}
-
-							//		var form = new RepositoryItemsForm( "Add Files", "Select files to add:", formItems.ToArray(), true );
-							//		if( form.ShowDialog() != DialogResult.OK )
-							//			return;
-
-							//		var checkedFormItems = form.GetCheckedItems();
-							//		RepositoryLocal.Add( checkedFormItems.Select( i => i.FileName ).ToArray() );
-
-							//		EditorAPI.FindWindow<ResourcesWindow>().Invalidate( true );
-							//	} );
-
-							//item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
-							////item.Enabled = selectedFiles.Exists( fileName => WorldLocalRepository.GetFileItem( fileName ) == null );
-							//items2.Add( item );
-						}
-
-						//set sync mode
-						{
-							void SetSyncMode( RepositorySyncMode? mode )
-							{
-								var formItems = new List<RepositoryItemsForm.Item>();
-
-								foreach( var fileName in selectedFilesWithInsideSelectedFolders )
-								{
-									if( RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) )
-									{
-										var formItem = new RepositoryItemsForm.Item();
-										formItem.FileName = fileName;
-										formItems.Add( formItem );
-									}
-								}
-
-								var form = new RepositoryItemsForm( "Sync Mode", "Select files to set sync mode:", formItems.ToArray(), true );
-								//var form = new RepositoryItemsForm( "Set Sync Mode", "Select files to set sync mode:", formItems.ToArray(), true );
-								if( form.ShowDialog() != DialogResult.OK )
-									return;
-
-								var checkedFormItems = form.GetCheckedItems();
-								RepositoryLocal.SetSyncMode( checkedFormItems.Select( i => i.FileName ).ToArray(), mode );
-
-								EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
-							}
-
-							var itemChangeSyncMode = new KryptonContextMenuItem( Translate( "Sync Mode" ), null );
-							//var itemChangeSyncMode = new KryptonContextMenuItem( Translate( "Set Sync Mode" ), null );
-
-							var items3 = new List<KryptonContextMenuItemBase>();
-
-							{
-								var item = new KryptonContextMenuItem( Translate( "Sync with Clients" ), EditorResourcesCache.Synchronize,
-									delegate ( object s, EventArgs e2 )
-									{
-										SetSyncMode( RepositorySyncMode.Synchronize );
-									} );
-								//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-								items3.Add( item );
-							}
-
-							{
-								var item = new KryptonContextMenuItem( Translate( "Server Only" ), EditorResourcesCache.ServerOnly,
-									delegate ( object s, EventArgs e2 )
-									{
-										SetSyncMode( RepositorySyncMode.ServerOnly );
-									} );
-								//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-								items3.Add( item );
-							}
-
-							//{
-							//	var item = new KryptonContextMenuItem( Translate( "Storage Only" ), EditorResourcesCache.StorageOnly,
-							//		delegate ( object s, EventArgs e2 )
-							//		{
-							//			SetSyncMode( RepositorySyncMode.StorageOnly );
-							//		} );
-							//	item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-							//	items3.Add( item );
-							//}
-
-							//{
-							//	var item = new KryptonContextMenuItem( Translate( "Revert" ), EditorResourcesCache.Undo,
-							//		delegate ( object s, EventArgs e2 )
-							//		{
-							//			SetSyncMode( null );
-							//		} );
-							//	//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-							//	items3.Add( item );
-							//}
-
-							itemChangeSyncMode.Items.Add( new KryptonContextMenuItems( items3.ToArray() ) );
-							itemChangeSyncMode.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-							items2.Add( itemChangeSyncMode );
-						}
-
-						//Delete
-						{
-							var item = new KryptonContextMenuItem( Translate( "Delete" ), EditorResourcesCache.Delete,
-								delegate ( object s, EventArgs e2 )
-								{
-									var formItems = new List<RepositoryItemsForm.Item>();
-
-									foreach( var fileName in selectedFilesWithInsideSelectedFolders )
-									{
-										var formItem = new RepositoryItemsForm.Item();
-										formItem.FileName = fileName;
-										formItem.Prefix = "DELETE";
-										formItems.Add( formItem );
-									}
-
-									var form = new RepositoryItemsForm( "Delete Files", "Select files to delete:", formItems.ToArray(), true );
-									if( form.ShowDialog() != DialogResult.OK )
-										return;
-
-									var checkedFormItems = form.GetCheckedItems();
-									RepositoryLocal.Delete( checkedFormItems.Select( i => i.FileName ).ToArray(), false );
-
-									EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
-								} );
-
-							item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
-							items2.Add( item );
-						}
-
-						//Delete (Keep local)
-						{
-							var item = new KryptonContextMenuItem( Translate( "Delete (Keep local)" ), EditorResourcesCache.Delete,
-								delegate ( object s, EventArgs e2 )
-								{
-									var formItems = new List<RepositoryItemsForm.Item>();
-
-									foreach( var fileName in selectedFilesWithInsideSelectedFolders )
-									{
-										var formItem = new RepositoryItemsForm.Item();
-										formItem.FileName = fileName;
-										formItem.Prefix = "DELETE";
-										formItems.Add( formItem );
-									}
-
-									var form = new RepositoryItemsForm( "Delete Files", "Select files to delete (Keep local):", formItems.ToArray(), true );
-									if( form.ShowDialog() != DialogResult.OK )
-										return;
-
-									var checkedFormItems = form.GetCheckedItems();
-									RepositoryLocal.Delete( checkedFormItems.Select( i => i.FileName ).ToArray(), true );
-
-									EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
-								} );
-
-							item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-							//item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
-							items2.Add( item );
-						}
-
-						//Revert local changes
-						{
-							//"Revert Local Changes"
-							var item = new KryptonContextMenuItem( Translate( "Revert" ), EditorResourcesCache.Undo,
-								delegate ( object s, EventArgs e2 )
-								{
-									var formItems = new List<RepositoryItemsForm.Item>();
-
-									foreach( var fileName in selectedFilesWithInsideSelectedFolders )
-									{
-										var formItem = new RepositoryItemsForm.Item();
-										formItem.FileName = fileName;
-										formItems.Add( formItem );
-									}
-
-									var form = new RepositoryItemsForm( "Revert Status Changes In Local Repository", "Select files to revert:", formItems.ToArray(), true );
-									if( form.ShowDialog() != DialogResult.OK )
-										return;
-
-									var checkedFormItems = form.GetCheckedItems();
-									RepositoryLocal.Revert( checkedFormItems.Select( i => i.FileName ).ToArray() );
-
-									EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
-								} );
-
-							item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryLocal.FileItemExists( fileName ) );
-							//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
-							//item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
-							items2.Add( item );
-						}
-
-						////separator
-						//items2.Add( new KryptonContextMenuSeparator() );
-
-						////separator
-						//items2.Add( new KryptonContextMenuSeparator() );
-
-						////Settings
-						//{
-						//	var item = new KryptonContextMenuItem( Translate( "Settings" ), EditorResourcesCache.Properties,
-						//		delegate ( object s, EventArgs e2 )
-						//		{
-						//			RepositorySettingsFile.Settings settings = null;
-
-						//			var repositorySettingsFile = Path.Combine( VirtualFileSystem.Directories.Project, "Repository.settings" );
-						//			if( File.Exists( repositorySettingsFile ) )
-						//			{
-						//				if( !RepositorySettingsFile.Load( repositorySettingsFile, out settings, out var error2 ) )
-						//				{
-						//					Log.Warning( "Unable to load Repository.settings. " + error2 );
-						//					return;
-						//				}
-						//			}
-
-						//			var form = new RepositorySettingsForm( settings );
-						//			if( form.ShowDialog() != DialogResult.OK )
-						//				return;
-
-						//			var newSettings = form.GetNewSettings();
-
-						//			RepositorySettingsFile.Save( repositorySettingsFile, newSettings, out var error );
-						//			if( !string.IsNullOrEmpty( error ) )
-						//			{
-						//				Log.Warning( "Unable to save Repository.settings. " + error );
-						//				return;
-						//			}
-
-						//			ScreenNotifications.Show( Translate( "The file was updated successfully." ) );
-						//		} );
-
-						//	item.Enabled = selectedFullPathFolders.Count != 0 || selectedFullPathFiles.Count != 0;
-						//	//item.Enabled = selectedFiles.Exists( fileName => WorldLocalRepository.GetFileItem( fileName ) == null );
-						//	items2.Add( item );
-						//}
-
-						itemWorld.Items.Add( new KryptonContextMenuItems( items2.ToArray() ) );
-						items.Add( itemWorld );
-
-						//separator
-						items.Add( new KryptonContextMenuSeparator() );
-					}
-#endif
+					//#if CLOUD
+					//					if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+					//					{
+					//						List<string> selectedFilesWithInsideSelectedFolders;
+					//						{
+					//							var selectedFilesSet = new ESet<string>();
+
+					//							foreach( var item in SelectedItems )
+					//							{
+					//								var fileItem2 = item as ContentBrowserItem_File;
+					//								if( fileItem2 != null )
+					//								{
+					//									//!!!!какие отсечь?
+
+					//									if( fileItem2.IsDirectory )
+					//									{
+					//										try
+					//										{
+					//											foreach( var fullPath in Directory.GetFiles( fileItem2.FullPath, "*", SearchOption.AllDirectories ) )
+					//											{
+					//												var fileName = VirtualPathUtility.GetAllFilesPathByReal( fullPath );
+					//												if( !string.IsNullOrEmpty( fileName ) )
+					//													selectedFilesSet.AddWithCheckAlreadyContained( fileName );
+					//											}
+					//										}
+					//										catch { }
+					//									}
+					//									else
+					//									{
+					//										var fileName = VirtualPathUtility.GetAllFilesPathByReal( fileItem2.FullPath );
+					//										if( !string.IsNullOrEmpty( fileName ) )
+					//											selectedFilesSet.AddWithCheckAlreadyContained( fileName );
+					//									}
+					//								}
+					//							}
+
+					//							selectedFilesWithInsideSelectedFolders = new List<string>( selectedFilesSet );
+					//							CollectionUtility.MergeSort( selectedFilesWithInsideSelectedFolders, delegate ( string f1, string f2 )
+					//							{
+					//								return string.Compare( f1 + " ", f2 + " ", false );
+					//							}, true );
+					//						}
+
+					//						var selectedFullPathFolders = new List<string>();
+					//						var selectedFullPathFiles = new List<string>();
+					//						{
+					//							foreach( var item in SelectedItems )
+					//							{
+					//								var fileItem2 = item as ContentBrowserItem_File;
+					//								if( fileItem2 != null )
+					//								{
+					//									if( fileItem2.IsDirectory )
+					//										selectedFullPathFolders.Add( fileItem2.FullPath );
+					//									else
+					//										selectedFullPathFiles.Add( fileItem2.FullPath );
+					//								}
+					//							}
+					//						}
+
+
+					//						var itemWorld = new KryptonContextMenuItem( Translate( "Repository" ), EditorResourcesCache.Database, null );
+
+					//						var items2 = new List<KryptonContextMenuItemBase>();
+
+					//						//Get
+					//						{
+					//							var item = new KryptonContextMenuItem( Translate( "Get Selected" ), EditorResourcesCache.MoveDown,
+					//								delegate ( object s, EventArgs e2 )
+					//								{
+					//									RepositoryActionsWithServer.Get( selectedFullPathFolders, selectedFullPathFiles, EngineInfo.CloudProjectInfo.ID, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
+					//								} );
+					//							item.Enabled = selectedFullPathFolders.Count != 0 || selectedFullPathFiles.Count != 0;
+					//							items2.Add( item );
+					//						}
+
+					//						//Commit
+					//						{
+					//							var item = new KryptonContextMenuItem( Translate( "Commit Selected" ), EditorResourcesCache.MoveUp,
+					//							   delegate ( object s, EventArgs e2 )
+					//							   {
+					//								   RepositoryActionsWithServer.Commit( selectedFullPathFolders, selectedFullPathFiles, EngineInfo.CloudProjectInfo.ID, true, true, VirtualFileSystem.Directories.AllFiles, EditorForm.Instance );
+					//							   } );
+					//							item.Enabled = selectedFullPathFolders.Count != 0 || selectedFullPathFiles.Count != 0;
+					//							items2.Add( item );
+					//						}
+
+					//						//separator
+					//						items2.Add( new KryptonContextMenuSeparator() );
+
+					//						//Add
+					//						{
+					//							void Add( RepositorySyncMode mode )
+					//							{
+					//								var formItems = new List<RepositoryItemsForm.Item>();
+
+					//								foreach( var fileName in selectedFilesWithInsideSelectedFolders )
+					//								{
+					//									var formItem = new RepositoryItemsForm.Item();
+					//									formItem.FileName = fileName;
+					//									formItems.Add( formItem );
+					//								}
+
+					//								var form = new RepositoryItemsForm( "Add Files", "Select files to add:", formItems.ToArray(), true );
+					//								if( form.ShowDialog() != DialogResult.OK )
+					//									return;
+
+					//								var checkedFormItems = form.GetCheckedItems();
+					//								RepositoryLocal.Add( checkedFormItems.Select( i => i.FileName ).ToArray(), mode );
+
+					//								EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
+					//							}
+
+					//							var itemAdd = new KryptonContextMenuItem( Translate( "Add" ), null );
+					//							var items3 = new List<KryptonContextMenuItemBase>();
+
+					//							{
+					//								var item = new KryptonContextMenuItem( Translate( "Default sync mode" ), EditorResourcesCache.Synchronize,
+					//									delegate ( object s, EventArgs e2 )
+					//									{
+					//										Add( RepositorySyncMode.Synchronize );
+					//									} );
+					//								items3.Add( item );
+					//							}
+
+					//							items3.Add( new KryptonContextMenuSeparator() );
+
+					//							{
+					//								var item = new KryptonContextMenuItem( Translate( "Sync with Clients" ), EditorResourcesCache.Synchronize,
+					//									delegate ( object s, EventArgs e2 )
+					//									{
+					//										Add( RepositorySyncMode.Synchronize );
+					//									} );
+					//								items3.Add( item );
+					//							}
+
+					//							{
+					//								var item = new KryptonContextMenuItem( Translate( "Server Only" ), EditorResourcesCache.ServerOnly,
+					//									delegate ( object s, EventArgs e2 )
+					//									{
+					//										Add( RepositorySyncMode.ServerOnly );
+					//									} );
+					//								items3.Add( item );
+					//							}
+
+					//							itemAdd.Items.Add( new KryptonContextMenuItems( items3.ToArray() ) );
+					//							itemAdd.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) == null && !RepositoryLocal.FileItemExists( fileName ) );
+					//							//itemAdd.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
+					//							items2.Add( itemAdd );
+
+					//							//var item = new KryptonContextMenuItem( Translate( "Add" ), EditorResourcesCache.Add,
+					//							//	delegate ( object s, EventArgs e2 )
+					//							//	{
+					//							//		var formItems = new List<RepositoryItemsForm.Item>();
+
+					//							//		foreach( var fileName in selectedFilesWithInsideSelectedFolders )
+					//							//		{
+					//							//			var formItem = new RepositoryItemsForm.Item();
+					//							//			formItem.FileName = fileName;
+					//							//			formItems.Add( formItem );
+					//							//		}
+
+					//							//		var form = new RepositoryItemsForm( "Add Files", "Select files to add:", formItems.ToArray(), true );
+					//							//		if( form.ShowDialog() != DialogResult.OK )
+					//							//			return;
+
+					//							//		var checkedFormItems = form.GetCheckedItems();
+					//							//		RepositoryLocal.Add( checkedFormItems.Select( i => i.FileName ).ToArray() );
+
+					//							//		EditorAPI.FindWindow<ResourcesWindow>().Invalidate( true );
+					//							//	} );
+
+					//							//item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
+					//							////item.Enabled = selectedFiles.Exists( fileName => WorldLocalRepository.GetFileItem( fileName ) == null );
+					//							//items2.Add( item );
+					//						}
+
+					//						//set sync mode
+					//						{
+					//							void SetSyncMode( RepositorySyncMode? mode )
+					//							{
+					//								var formItems = new List<RepositoryItemsForm.Item>();
+
+					//								foreach( var fileName in selectedFilesWithInsideSelectedFolders )
+					//								{
+					//									if( RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) )
+					//									{
+					//										var formItem = new RepositoryItemsForm.Item();
+					//										formItem.FileName = fileName;
+					//										formItems.Add( formItem );
+					//									}
+					//								}
+
+					//								var form = new RepositoryItemsForm( "Sync Mode", "Select files to set sync mode:", formItems.ToArray(), true );
+					//								//var form = new RepositoryItemsForm( "Set Sync Mode", "Select files to set sync mode:", formItems.ToArray(), true );
+					//								if( form.ShowDialog() != DialogResult.OK )
+					//									return;
+
+					//								var checkedFormItems = form.GetCheckedItems();
+					//								RepositoryLocal.SetSyncMode( checkedFormItems.Select( i => i.FileName ).ToArray(), mode );
+
+					//								EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
+					//							}
+
+					//							var itemChangeSyncMode = new KryptonContextMenuItem( Translate( "Sync Mode" ), null );
+					//							//var itemChangeSyncMode = new KryptonContextMenuItem( Translate( "Set Sync Mode" ), null );
+
+					//							var items3 = new List<KryptonContextMenuItemBase>();
+
+					//							{
+					//								var item = new KryptonContextMenuItem( Translate( "Sync with Clients" ), EditorResourcesCache.Synchronize,
+					//									delegate ( object s, EventArgs e2 )
+					//									{
+					//										SetSyncMode( RepositorySyncMode.Synchronize );
+					//									} );
+					//								//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//								items3.Add( item );
+					//							}
+
+					//							{
+					//								var item = new KryptonContextMenuItem( Translate( "Server Only" ), EditorResourcesCache.ServerOnly,
+					//									delegate ( object s, EventArgs e2 )
+					//									{
+					//										SetSyncMode( RepositorySyncMode.ServerOnly );
+					//									} );
+					//								//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//								items3.Add( item );
+					//							}
+
+					//							//{
+					//							//	var item = new KryptonContextMenuItem( Translate( "Storage Only" ), EditorResourcesCache.StorageOnly,
+					//							//		delegate ( object s, EventArgs e2 )
+					//							//		{
+					//							//			SetSyncMode( RepositorySyncMode.StorageOnly );
+					//							//		} );
+					//							//	item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//							//	items3.Add( item );
+					//							//}
+
+					//							//{
+					//							//	var item = new KryptonContextMenuItem( Translate( "Revert" ), EditorResourcesCache.Undo,
+					//							//		delegate ( object s, EventArgs e2 )
+					//							//		{
+					//							//			SetSyncMode( null );
+					//							//		} );
+					//							//	//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//							//	items3.Add( item );
+					//							//}
+
+					//							itemChangeSyncMode.Items.Add( new KryptonContextMenuItems( items3.ToArray() ) );
+					//							itemChangeSyncMode.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//							items2.Add( itemChangeSyncMode );
+					//						}
+
+					//						//Delete
+					//						{
+					//							var item = new KryptonContextMenuItem( Translate( "Delete" ), EditorResourcesCache.Delete,
+					//								delegate ( object s, EventArgs e2 )
+					//								{
+					//									var formItems = new List<RepositoryItemsForm.Item>();
+
+					//									foreach( var fileName in selectedFilesWithInsideSelectedFolders )
+					//									{
+					//										var formItem = new RepositoryItemsForm.Item();
+					//										formItem.FileName = fileName;
+					//										formItem.Prefix = "DELETE";
+					//										formItems.Add( formItem );
+					//									}
+
+					//									var form = new RepositoryItemsForm( "Delete Files", "Select files to delete:", formItems.ToArray(), true );
+					//									if( form.ShowDialog() != DialogResult.OK )
+					//										return;
+
+					//									var checkedFormItems = form.GetCheckedItems();
+					//									RepositoryLocal.Delete( checkedFormItems.Select( i => i.FileName ).ToArray(), false );
+
+					//									EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
+					//								} );
+
+					//							item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
+					//							items2.Add( item );
+					//						}
+
+					//						//Delete (Keep local)
+					//						{
+					//							var item = new KryptonContextMenuItem( Translate( "Delete (Keep local)" ), EditorResourcesCache.Delete,
+					//								delegate ( object s, EventArgs e2 )
+					//								{
+					//									var formItems = new List<RepositoryItemsForm.Item>();
+
+					//									foreach( var fileName in selectedFilesWithInsideSelectedFolders )
+					//									{
+					//										var formItem = new RepositoryItemsForm.Item();
+					//										formItem.FileName = fileName;
+					//										formItem.Prefix = "DELETE";
+					//										formItems.Add( formItem );
+					//									}
+
+					//									var form = new RepositoryItemsForm( "Delete Files", "Select files to delete (Keep local):", formItems.ToArray(), true );
+					//									if( form.ShowDialog() != DialogResult.OK )
+					//										return;
+
+					//									var checkedFormItems = form.GetCheckedItems();
+					//									RepositoryLocal.Delete( checkedFormItems.Select( i => i.FileName ).ToArray(), true );
+
+					//									EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
+					//								} );
+
+					//							item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//							//item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
+					//							items2.Add( item );
+					//						}
+
+					//						//Revert local changes
+					//						{
+					//							//"Revert Local Changes"
+					//							var item = new KryptonContextMenuItem( Translate( "Revert" ), EditorResourcesCache.Undo,
+					//								delegate ( object s, EventArgs e2 )
+					//								{
+					//									var formItems = new List<RepositoryItemsForm.Item>();
+
+					//									foreach( var fileName in selectedFilesWithInsideSelectedFolders )
+					//									{
+					//										var formItem = new RepositoryItemsForm.Item();
+					//										formItem.FileName = fileName;
+					//										formItems.Add( formItem );
+					//									}
+
+					//									var form = new RepositoryItemsForm( "Revert Status Changes In Local Repository", "Select files to revert:", formItems.ToArray(), true );
+					//									if( form.ShowDialog() != DialogResult.OK )
+					//										return;
+
+					//									var checkedFormItems = form.GetCheckedItems();
+					//									RepositoryLocal.Revert( checkedFormItems.Select( i => i.FileName ).ToArray() );
+
+					//									EditorAPI2.FindWindow<ResourcesWindow>().Invalidate( true );
+					//								} );
+
+					//							item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryLocal.FileItemExists( fileName ) );
+					//							//item.Enabled = selectedFilesWithInsideSelectedFolders.Exists( fileName => RepositoryServerState.GetFileItem( fileName ) != null || RepositoryLocal.FileItemExists( fileName ) );
+					//							//item.Enabled = selectedFilesWithInsideSelectedFolders.Count != 0;
+					//							items2.Add( item );
+					//						}
+
+					//						////separator
+					//						//items2.Add( new KryptonContextMenuSeparator() );
+
+					//						////separator
+					//						//items2.Add( new KryptonContextMenuSeparator() );
+
+					//						////Settings
+					//						//{
+					//						//	var item = new KryptonContextMenuItem( Translate( "Settings" ), EditorResourcesCache.Properties,
+					//						//		delegate ( object s, EventArgs e2 )
+					//						//		{
+					//						//			RepositorySettingsFile.Settings settings = null;
+
+					//						//			var repositorySettingsFile = Path.Combine( VirtualFileSystem.Directories.Project, "Repository.settings" );
+					//						//			if( File.Exists( repositorySettingsFile ) )
+					//						//			{
+					//						//				if( !RepositorySettingsFile.Load( repositorySettingsFile, out settings, out var error2 ) )
+					//						//				{
+					//						//					Log.Warning( "Unable to load Repository.settings. " + error2 );
+					//						//					return;
+					//						//				}
+					//						//			}
+
+					//						//			var form = new RepositorySettingsForm( settings );
+					//						//			if( form.ShowDialog() != DialogResult.OK )
+					//						//				return;
+
+					//						//			var newSettings = form.GetNewSettings();
+
+					//						//			RepositorySettingsFile.Save( repositorySettingsFile, newSettings, out var error );
+					//						//			if( !string.IsNullOrEmpty( error ) )
+					//						//			{
+					//						//				Log.Warning( "Unable to save Repository.settings. " + error );
+					//						//				return;
+					//						//			}
+
+					//						//			ScreenNotifications.Show( Translate( "The file was updated successfully." ) );
+					//						//		} );
+
+					//						//	item.Enabled = selectedFullPathFolders.Count != 0 || selectedFullPathFiles.Count != 0;
+					//						//	//item.Enabled = selectedFiles.Exists( fileName => WorldLocalRepository.GetFileItem( fileName ) == null );
+					//						//	items2.Add( item );
+					//						//}
+
+					//						itemWorld.Items.Add( new KryptonContextMenuItems( items2.ToArray() ) );
+					//						items.Add( itemWorld );
+
+					//						//separator
+					//						items.Add( new KryptonContextMenuSeparator() );
+					//					}
+					//#endif
 
 					//Cut
 					{

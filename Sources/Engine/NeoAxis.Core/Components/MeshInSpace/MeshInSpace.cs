@@ -2742,8 +2742,9 @@ namespace NeoAxis
 
 			if( NetworkIsServer && collisionSound != null )
 			{
-				BeginNetworkMessageToEveryone( "CollisionSoundPlay" );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "CollisionSoundPlay" );
+				if( m != null )
+					m.End();
 			}
 		}
 

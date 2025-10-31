@@ -159,6 +159,21 @@ namespace NeoAxis
 			return true;
 		}
 
+		public static bool IsCorrectDirectoryName( string directoryName )
+		{
+			if( string.IsNullOrEmpty( directoryName ) )
+				return false;
+
+			char[] invalidChars = Path.GetInvalidFileNameChars();
+			foreach( char c in directoryName )
+			{
+				if( Array.IndexOf<char>( invalidChars, c ) != -1 )
+					return false;
+			}
+
+			return true;
+		}
+
 		public static bool IsUserDirectoryPath( string path )
 		{
 			if( path.Length >= 5 && path[ 4 ] == ':' )

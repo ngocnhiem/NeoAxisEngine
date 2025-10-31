@@ -249,12 +249,12 @@ namespace NeoAxis
 		{
 			if( NetworkIsClient )
 			{
-				var writer = BeginNetworkMessageToServer( "ChangingBegin" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "ChangingBegin" );
+				if( m != null )
 				{
-					writer.Write( forward );
-					writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
-					EndNetworkMessage();
+					m.Writer.Write( forward );
+					m.Writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
+					m.End();
 				}
 			}
 			else
@@ -279,12 +279,12 @@ namespace NeoAxis
 		{
 			if( NetworkIsClient )
 			{
-				var writer = BeginNetworkMessageToServer( "ChangingEnd" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "ChangingEnd" );
+				if( m != null )
 				{
-					writer.Write( forward );
-					writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
-					EndNetworkMessage();
+					m.Writer.Write( forward );
+					m.Writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
+					m.End();
 				}
 			}
 			else
@@ -338,8 +338,9 @@ namespace NeoAxis
 				SoundPlay( TypeCached.SoundTick );
 				if( NetworkIsServer && TypeCached.SoundTick.ReferenceOrValueSpecified )
 				{
-					BeginNetworkMessageToEveryone( "SoundTick" );
-					EndNetworkMessage();
+					var m = BeginNetworkMessageToEveryone( "SoundTick" );
+					if( m != null )
+						m.End();
 				}
 			}
 		}
@@ -521,11 +522,12 @@ namespace NeoAxis
 		{
 			if( NetworkIsServer )
 			{
-				var writer = client != null ? BeginNetworkMessage( client, "Changing" ) : BeginNetworkMessageToEveryone( "Changing" );
+				var m = client != null ? BeginNetworkMessage( client, "Changing" ) : BeginNetworkMessageToEveryone( "Changing" );
+				var writer = m.Writer;
 				writer.Write( changing );
 				writer.Write( changingForward );
 				writer.WriteVariableUInt64( changingInitiator != null ? (ulong)changingInitiator.NetworkID : 0 );
-				EndNetworkMessage();
+				m.End();
 			}
 		}
 

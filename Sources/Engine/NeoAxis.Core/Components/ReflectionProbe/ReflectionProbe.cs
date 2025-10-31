@@ -1140,9 +1140,12 @@ namespace NeoAxis
 		{
 			if( NetworkIsServer )
 			{
-				var writer = client != null ? BeginNetworkMessage( client, "OwnedFileName" ) : BeginNetworkMessageToEveryone( "OwnedFileName" );
-				writer.Write( ComponentUtility.GetOwnedFileNameOfComponent( this ) );
-				EndNetworkMessage();
+				var m = client != null ? BeginNetworkMessage( client, "OwnedFileName" ) : BeginNetworkMessageToEveryone( "OwnedFileName" );
+				if( m != null )
+				{
+					m.Writer.Write( ComponentUtility.GetOwnedFileNameOfComponent( this ) );
+					m.End();
+				}
 			}
 		}
 
@@ -1160,7 +1163,7 @@ namespace NeoAxis
 
 			if( message == "OwnedFileName" )
 			{
-				networkOwnedFileNameOfComponent = reader.ReadString();
+				networkOwnedFileNameOfComponent = reader.ReadString() ?? string.Empty;
 				processedCubemapNeedUpdate = true;
 			}
 

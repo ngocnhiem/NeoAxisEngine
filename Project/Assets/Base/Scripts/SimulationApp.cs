@@ -634,8 +634,9 @@ namespace Project
 
 		static void MainViewport_RenderUI()
 		{
-			//configure cursor file name
-			EngineApp.SystemCursorFileName = @"Base\UI\Cursors\DefaultSystem.cur";
+			//enable it to use custom cursor:
+			//configure cursor file name		
+			//EngineApp.CustomCursorFileName = @"Base\UI\Cursors\DefaultSystem.cur";
 
 			//Draw UI controls
 			MainViewport.UIContainer.PerformRenderUI( MainViewport.CanvasRenderer );

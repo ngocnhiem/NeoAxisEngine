@@ -1,6 +1,9 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
+using Internal.LiteDB;
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -157,15 +160,14 @@ namespace NeoAxis
 		//	bitLength = newLength;
 		//}
 
-		//public void Write( sbyte source )
-		//{
-		//   unchecked
-		//   {
-		//      Write( (byte)source );
-		//   }
-		//}
-
-		//public void Write( sbyte source, int numberOfBits )
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( sbyte source )
+		{
+			unsafe
+			{
+				Write( &source, 1 );
+			}
+		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void Write( ushort source )
@@ -178,6 +180,15 @@ namespace NeoAxis
 			//ExpandBuffer( newLength );
 			//BitWriter.WriteUInt32( (uint)source, 16, data, bitLength );
 			//bitLength = newLength;
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( char source )
+		{
+			unsafe
+			{
+				Write( &source, 2 );
+			}
 		}
 
 		//public void Write( ushort source, int numberOfBits )
@@ -364,6 +375,15 @@ namespace NeoAxis
 			//}
 		}
 
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( decimal source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( decimal ) );
+			}
+		}
+
 		//!!!!их тоже можно через поинтер все элементы сразу
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
@@ -505,6 +525,22 @@ namespace NeoAxis
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( ColorValuePowered source )
+		{
+			Write( source.Red );
+			Write( source.Green );
+			Write( source.Blue );
+			Write( source.Alpha );
+			Write( source.Power );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( ColorByte source )
+		{
+			Write( source.PackedValue );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void Write( ref SphericalDirectionF source )
 		{
 			Write( source.Horizontal );
@@ -617,70 +653,10 @@ namespace NeoAxis
 		[MethodImpl( (MethodImplOptions)512 )]
 		public void Write( string source )
 		{
-			//!!!!merge to one method, but errors
-
-
-			//if( source == null )
-			//	WriteVariableInt32( -1 );
-			//else if( source.Length == 0 )
-			//	WriteVariableInt32( 0 );
-			//else
-			//{
-			//	if( source.Length < 255 )
-			//	{
-			//		unsafe
-			//		{
-			//			fixed( char* chars = source )
-			//			{
-			//				var bytes = stackalloc byte[ 1024 ];
-			//				var bytesLength = Encoding.UTF8.GetBytes( chars, source.Length, bytes, 1024 );
-			//				WriteVariableInt32( bytesLength );
-			//				Write( bytes, bytesLength );
-			//			}
-			//		}
-			//	}
-			//	else
-			//	{
-			//		var bytes = Encoding.UTF8.GetBytes( source );
-			//		WriteVariableInt32( bytes.Length );
-			//		Write( bytes );
-			//	}
-			//}
-
-
-			if( !string.IsNullOrEmpty( source ) )
-			{
-				if( source.Length < 255 )
-				{
-					unsafe
-					{
-						fixed( char* chars = source )
-						{
-							var bytes = stackalloc byte[ 1024 ];
-							var bytesLength = Encoding.UTF8.GetBytes( chars, source.Length, bytes, 1024 );
-							WriteVariableUInt32( (uint)bytesLength );
-							Write( bytes, bytesLength );
-						}
-					}
-				}
-				else
-				{
-					var bytes = Encoding.UTF8.GetBytes( source );
-					WriteVariableUInt32( (uint)bytes.Length );
-					Write( bytes );
-				}
-			}
-			else
-				WriteVariableUInt32( 0 );
-		}
-
-		[MethodImpl( (MethodImplOptions)512 )]
-		public void WriteWithNullSupport( string source )
-		{
 			if( source == null )
-				WriteVariableInt32( -1 );
+				WriteVariable( -1 );
 			else if( source.Length == 0 )
-				WriteVariableInt32( 0 );
+				WriteVariable( 0 );
 			else
 			{
 				if( source.Length < 255 )
@@ -691,7 +667,7 @@ namespace NeoAxis
 						{
 							var bytes = stackalloc byte[ 1024 ];
 							var bytesLength = Encoding.UTF8.GetBytes( chars, source.Length, bytes, 1024 );
-							WriteVariableInt32( bytesLength );
+							WriteVariable( bytesLength );
 							Write( bytes, bytesLength );
 						}
 					}
@@ -699,18 +675,48 @@ namespace NeoAxis
 				else
 				{
 					var bytes = Encoding.UTF8.GetBytes( source );
-					WriteVariableInt32( bytes.Length );
+					WriteVariable( bytes.Length );
 					Write( bytes );
 				}
 			}
 		}
+
+		//old
+		//[MethodImpl( (MethodImplOptions)512 )]
+		//public void Write( string source )
+		//{
+		//	if( !string.IsNullOrEmpty( source ) )
+		//	{
+		//		if( source.Length < 255 )
+		//		{
+		//			unsafe
+		//			{
+		//				fixed( char* chars = source )
+		//				{
+		//					var bytes = stackalloc byte[ 1024 ];
+		//					var bytesLength = Encoding.UTF8.GetBytes( chars, source.Length, bytes, 1024 );
+		//					WriteVariableUInt32( (uint)bytesLength );
+		//					Write( bytes, bytesLength );
+		//				}
+		//			}
+		//		}
+		//		else
+		//		{
+		//			var bytes = Encoding.UTF8.GetBytes( source );
+		//			WriteVariableUInt32( (uint)bytes.Length );
+		//			Write( bytes );
+		//		}
+		//	}
+		//	else
+		//		WriteVariableUInt32( 0 );
+		//}
 
 		/// <summary>
 		/// Write Base128 encoded variable sized unsigned integer
 		/// </summary>
 		/// <returns>number of bytes written</returns>
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public int WriteVariableUInt32( uint source )
+		public int WriteVariable( uint source )
 		{
 			int retval = 1;
 			uint num1 = source;
@@ -724,12 +730,20 @@ namespace NeoAxis
 			return retval;
 		}
 
+		//!!!!remove
+		//[Obsolete]
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public int WriteVariableUInt32( uint source )
+		{
+			return WriteVariable( source );
+		}
+
 		/// <summary>
 		/// Write Base128 encoded variable sized signed integer
 		/// </summary>
 		/// <returns>number of bytes written</returns>
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public int WriteVariableInt32( int source )
+		public int WriteVariable( int source )
 		{
 			int retval = 1;
 			uint num1 = (uint)( ( source << 1 ) ^ ( source >> 31 ) );
@@ -743,12 +757,20 @@ namespace NeoAxis
 			return retval;
 		}
 
+		//!!!!remove
+		//[Obsolete]
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public int WriteVariableInt32( int source )
+		{
+			return WriteVariable( source );
+		}
+
 		/// <summary>
 		/// Write ulong encoded variable sized unsigned integer.
 		/// </summary>
 		/// <returns>number of bytes written</returns>
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public int WriteVariableUInt64( ulong source )
+		public int WriteVariable( ulong source )
 		{
 			int retval = 1;
 			ulong num1 = source;
@@ -760,6 +782,41 @@ namespace NeoAxis
 			}
 			Write( (byte)num1 );
 			return retval;
+		}
+
+		//!!!!remove
+		//[Obsolete]
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public int WriteVariableUInt64( ulong source )
+		{
+			return WriteVariable( source );
+		}
+
+		/// <summary>
+		/// Write long encoded variable sized signed integer.
+		/// </summary>
+		/// <returns>number of bytes written</returns>
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public int WriteVariable( long source )
+		{
+			int retval = 1;
+			ulong num1 = (ulong)( ( source << 1 ) ^ ( source >> 63 ) );
+			while( num1 >= 0x80 )
+			{
+				Write( (byte)( num1 | 0x80 ) );
+				num1 = num1 >> 7;
+				retval++;
+			}
+			Write( (byte)num1 );
+			return retval;
+		}
+
+		//!!!!remove
+		//[Obsolete]
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public int WriteVariableInt64( long source )
+		{
+			return WriteVariable( source );
 		}
 
 		///// <summary>
@@ -884,6 +941,13 @@ namespace NeoAxis
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( RangeI source )
+		{
+			Write( source.Minimum );
+			Write( source.Maximum );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void Write( ref Vector3 source )
 		{
 			Write( source.X );
@@ -1000,6 +1064,22 @@ namespace NeoAxis
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( AnglesF source )
+		{
+			Write( source.Roll );
+			Write( source.Pitch );
+			Write( source.Yaw );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Angles source )
+		{
+			Write( source.Roll );
+			Write( source.Pitch );
+			Write( source.Yaw );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void Write( DateTime source )
 		{
 			Write( source.Ticks );
@@ -1014,7 +1094,7 @@ namespace NeoAxis
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArraySegment<byte> ToArraySegment()
+		public ArraySegment<byte> AsArraySegment()
 		{
 			return new ArraySegment<byte>( data, 0, length );
 		}
@@ -1071,6 +1151,449 @@ namespace NeoAxis
 			Write( ref source );
 		}
 
-		//!!!!more types
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Matrix2F source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Matrix2F ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Matrix2 source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Matrix2 ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Matrix3F source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Matrix3F ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Matrix3 source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Matrix3 ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Matrix4F source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Matrix4F ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Matrix4 source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Matrix4 ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( PlaneF source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( PlaneF ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Plane source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Plane ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Transform source )
+		{
+			Write( source.Position );
+			Write( source.Rotation );
+			Write( source.Scale );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( SphereF source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( SphereF ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( Sphere source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( Sphere ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( UIMeasureValueDouble source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( UIMeasureValueDouble ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( UIMeasureValueVector2 source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( UIMeasureValueVector2 ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( UIMeasureValueRectangle source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( UIMeasureValueRectangle ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( RangeVector3F source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( RangeVector3F ) );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( RangeColorValue source )
+		{
+			unsafe
+			{
+				Write( &source, sizeof( RangeColorValue ) );
+			}
+		}
+
+		public static bool TypeToWriteIsSupported( Type typeToWrite )
+		{
+			//simple types
+			var simpleType = SimpleTypes.GetTypeItem( typeToWrite );
+			if( simpleType != null )
+				return true;
+
+			//array
+			if( typeToWrite.IsArray )
+				return true;
+
+			//containers
+			{
+				Type containerType = typeToWrite;
+				if( typeToWrite.IsGenericType )
+					containerType = typeToWrite.GetGenericTypeDefinition();
+
+				if( containerType == typeof( List<> ) ||
+					containerType == typeof( ESet<> ) ||
+					containerType == typeof( HashSet<> ) ||
+					containerType == typeof( SortedSet<> ) ||
+					containerType == typeof( Stack<> ) ||
+					containerType == typeof( Queue<> ) )
+				{
+					//!!!!check element types
+
+					return true;
+				}
+
+				if( containerType == typeof( Dictionary<,> ) ||
+					containerType == typeof( EDictionary<,> ) ||
+					containerType == typeof( SortedList<,> ) )
+				{
+					//!!!!check element types
+
+					return true;
+				}
+			}
+
+			//tuple
+			if( typeToWrite.IsGenericType )
+			{
+				var genericType = typeToWrite.GetGenericTypeDefinition();
+
+				if( genericType == typeof( ValueTuple<> ) ||
+					genericType == typeof( ValueTuple<,> ) ||
+					genericType == typeof( ValueTuple<,,> ) ||
+					genericType == typeof( ValueTuple<,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,,,> ) )
+				{
+
+					//!!!!check element types
+
+					return true;
+				}
+
+				if( genericType == typeof( Tuple<> ) ||
+					genericType == typeof( Tuple<,> ) ||
+					genericType == typeof( Tuple<,,> ) ||
+					genericType == typeof( Tuple<,,,> ) ||
+					genericType == typeof( Tuple<,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,,,> ) )
+				{
+
+					//!!!!check element types
+
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public void Write( Type typeToWrite, object value )
+		{
+			//!!!!slowly
+
+			//simple types
+			var simpleType = SimpleTypes.GetTypeItem( typeToWrite );
+			if( simpleType != null )
+			{
+				simpleType.WriteFunction( this, value );
+				return;
+			}
+
+			//array
+			if( typeToWrite.IsArray )
+			{
+				//!!!!multi dimension support
+
+				//!!!!slowly
+				//arrays with simple types may be optimized. same as MetadataManager. and cache simple type item
+
+				var valueType = value.GetType();
+				var propertyCount = valueType.GetProperty( "Length" );
+				var methodGetValue = valueType.GetMethod( "GetValue", new Type[] { typeof( int ) } );
+				var elementType = valueType.GetElementType();
+
+				int count = (int)propertyCount.GetValue( value, null );
+				WriteVariable( count );
+
+				for( int n = 0; n < count; n++ )
+				{
+					var itemValue = methodGetValue.Invoke( value, new object[] { n } );
+					Write( elementType, itemValue );
+				}
+
+				return;
+			}
+
+			//containers
+			{
+				Type containerType = typeToWrite;
+				if( typeToWrite.IsGenericType )
+					containerType = typeToWrite.GetGenericTypeDefinition();
+
+				if( containerType == typeof( List<> ) ||
+					containerType == typeof( ESet<> ) ||
+					containerType == typeof( HashSet<> ) ||
+					containerType == typeof( SortedSet<> ) ||
+					containerType == typeof( Stack<> ) ||
+					containerType == typeof( Queue<> ) )
+				{
+					var valueType = value.GetType();
+					var propertyCount = valueType.GetProperty( "Count" );
+
+					int count = (int)propertyCount.GetValue( value, null );
+					WriteVariable( count );
+
+					if( count > 0 )
+					{
+						var elementType = TypeUtility.GetGenericArgumentInBaseTypes( typeToWrite, containerType, 0 );
+
+						foreach( object elementValue in (IEnumerable)value )
+							Write( elementType, elementValue );
+					}
+
+					return;
+				}
+
+				if( containerType == typeof( Dictionary<,> ) ||
+					containerType == typeof( EDictionary<,> ) ||
+					containerType == typeof( SortedList<,> ) )
+				{
+					var valueType = value.GetType();
+					var propertyCount = valueType.GetProperty( "Count" );
+
+					int count = (int)propertyCount.GetValue( value, null );
+					WriteVariable( count );
+
+					if( count > 0 )
+					{
+						PropertyInfo propertyKey = null;
+						PropertyInfo propertyValue = null;
+
+						var elementTypes = TypeUtility.GetGenericArgumentsInBaseTypes( typeToWrite, containerType );
+						var elementTypeKey = elementTypes[ 0 ];
+						var elementTypeValue = elementTypes[ 1 ];
+
+						foreach( object pair in (IEnumerable)value )
+						{
+							if( propertyKey == null )
+							{
+								propertyKey = pair.GetType().GetProperty( "Key" );
+								propertyValue = pair.GetType().GetProperty( "Value" );
+							}
+							var elementKey = propertyKey.GetValue( pair, new object[ 0 ] );
+							var elementValue = propertyValue.GetValue( pair, new object[ 0 ] );
+
+							Write( elementTypeKey, elementKey );
+							Write( elementTypeValue, elementValue );
+						}
+					}
+
+					return;
+				}
+			}
+
+			//tuples
+			if( typeToWrite.IsGenericType )
+			{
+				var genericType = typeToWrite.GetGenericTypeDefinition();
+
+				if( genericType == typeof( ValueTuple<> ) ||
+					genericType == typeof( ValueTuple<,> ) ||
+					genericType == typeof( ValueTuple<,,> ) ||
+					genericType == typeof( ValueTuple<,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,,> ) ||
+					genericType == typeof( ValueTuple<,,,,,,,> ) )
+				{
+					var fields = typeToWrite.GetFields( BindingFlags.Public | BindingFlags.Instance );
+					if( fields != null && fields.Length > 0 )
+					{
+						foreach( var field in fields )
+						{
+							var fieldValue = field.GetValue( value );
+							Write( field.FieldType, fieldValue );
+						}
+						return;
+					}
+				}
+
+				if( genericType == typeof( Tuple<> ) ||
+					genericType == typeof( Tuple<,> ) ||
+					genericType == typeof( Tuple<,,> ) ||
+					genericType == typeof( Tuple<,,,> ) ||
+					genericType == typeof( Tuple<,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,,> ) ||
+					genericType == typeof( Tuple<,,,,,,,> ) )
+				{
+					var properties = typeToWrite.GetProperties( BindingFlags.Public | BindingFlags.Instance );
+					if( properties != null && properties.Length > 0 )
+					{
+						foreach( var property in properties )
+						{
+							var propertyValue = property.GetValue( value );
+							Write( property.PropertyType, propertyValue );
+						}
+						return;
+					}
+				}
+			}
+
+			throw new NotSupportedException();
+		}
+
+		//support recusive custom structures?
+
+		public class TypeToWriteCustomStructureProperty
+		{
+			public string Name;
+			public Type PropertyType;
+			public Type FieldType;
+		}
+
+		public static bool TypeToWriteCustomStructureIsSupported( Type typeToWrite, out TypeToWriteCustomStructureProperty[] properties )
+		{
+			var propertiesResult = new List<TypeToWriteCustomStructureProperty>();
+
+			var fields2 = typeToWrite.GetFields( BindingFlags.Public | BindingFlags.Instance );
+			foreach( var field in fields2 )
+			{
+				//!!!!more checks
+
+				var p = new TypeToWriteCustomStructureProperty();
+				p.Name = field.Name;
+				p.FieldType = field.FieldType;
+				propertiesResult.Add( p );
+			}
+
+			var properties3 = typeToWrite.GetProperties( BindingFlags.Public | BindingFlags.Instance );
+			foreach( var property in properties3 )
+			{
+				//!!!!more checks
+
+				var p = new TypeToWriteCustomStructureProperty();
+				p.Name = property.Name;
+				p.PropertyType = property.PropertyType;
+				propertiesResult.Add( p );
+			}
+
+			properties = propertiesResult.ToArray();
+			return properties.Length != 0;
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public void WriteCustomStructure( Type typeToWrite, object value )
+		{
+			var fields = typeToWrite.GetFields( BindingFlags.Public | BindingFlags.Instance );
+			foreach( var field in fields )
+			{
+				//!!!!more checks
+
+				var fieldValue = field.GetValue( value );
+				Write( field.FieldType, fieldValue );
+			}
+
+			var properties = typeToWrite.GetProperties( BindingFlags.Public | BindingFlags.Instance );
+			foreach( var property in properties )
+			{
+				//!!!!more checks
+
+				var propertyValue = property.GetValue( value );
+				Write( property.PropertyType, propertyValue );
+			}
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void Write( ObjectId source )
+		{
+			Write( source.ToString() );
+		}
 	}
 }

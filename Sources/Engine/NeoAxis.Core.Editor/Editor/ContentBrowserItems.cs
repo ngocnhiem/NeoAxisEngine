@@ -788,127 +788,127 @@ namespace NeoAxis.Editor
 
 		public override Image[] GetCornerImages()
 		{
-#if CLOUD
-			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient && Owner.Mode == ContentBrowser.ModeEnum.Resources )
-			{
-				var projectFileName = VirtualPathUtility.GetAllFilesPathByReal( fullPath );
+//#if CLOUD
+//			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient && Owner.Mode == ContentBrowser.ModeEnum.Resources )
+//			{
+//				var projectFileName = VirtualPathUtility.GetAllFilesPathByReal( fullPath );
 
-				var images = new Image[ 1 ];
+//				var images = new Image[ 1 ];
 
-				if( IsDirectory )
-				{
-					if( RepositoryLocal.FolderContainsFileItems( projectFileName ) || RepositoryIconCache.FolderModified( projectFileName ) )
-					{
-						images[ 0 ] = EditorResourcesCache.Warning_32;
-					}
-					else
-					{
-						var serverStateItem = RepositoryServerState.GetFolderItem( projectFileName );
-						if( serverStateItem != null )
-						{
-							if( serverStateItem.ContainsSyncModeServerOnly && !serverStateItem.ContainsSyncModeSynchronize )
-								images[ 0 ] = EditorResourcesCache.ServerOnly_32;
-							else
-								images[ 0 ] = EditorResourcesCache.CheckedCircle_32;
-						}
-						else
-							images[ 0 ] = EditorResourcesCache.NotAdded_32;
-					}
-				}
-				else
-				{
-					var serverStateItem = RepositoryServerState.GetFileItem( projectFileName );
-					var localItemExists = RepositoryLocal.GetFileItemData( projectFileName, out var localStatus, out var localSyncMode );
+//				if( IsDirectory )
+//				{
+//					if( RepositoryLocal.FolderContainsFileItems( projectFileName ) || RepositoryIconCache.FolderModified( projectFileName ) )
+//					{
+//						images[ 0 ] = EditorResourcesCache.Warning_32;
+//					}
+//					else
+//					{
+//						var serverStateItem = RepositoryServerState.GetFolderItem( projectFileName );
+//						if( serverStateItem != null )
+//						{
+//							if( serverStateItem.ContainsSyncModeServerOnly && !serverStateItem.ContainsSyncModeSynchronize )
+//								images[ 0 ] = EditorResourcesCache.ServerOnly_32;
+//							else
+//								images[ 0 ] = EditorResourcesCache.CheckedCircle_32;
+//						}
+//						else
+//							images[ 0 ] = EditorResourcesCache.NotAdded_32;
+//					}
+//				}
+//				else
+//				{
+//					var serverStateItem = RepositoryServerState.GetFileItem( projectFileName );
+//					var localItemExists = RepositoryLocal.GetFileItemData( projectFileName, out var localStatus, out var localSyncMode );
 
-					//!!!!может _16 тоже
+//					//!!!!может _16 тоже
 
-					if( serverStateItem != null || localItemExists )
-					{
-						if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Added )
-							images[ 0 ] = EditorResourcesCache.AddCircle_32;
-						else if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Deleted )
-							images[ 0 ] = EditorResourcesCache.DeleteCircle_32;
-						else
-						{
-							var modified = false;
-							if( serverStateItem != null )
-							{
-								//check for modified data of the file
-								var iconsItem = RepositoryIconCache.GetFileItem( projectFileName );
-								var equal = iconsItem != null && serverStateItem.Length == iconsItem.Length && serverStateItem.Hash == iconsItem.Hash;
-								if( !equal )
-									modified = true;
+//					if( serverStateItem != null || localItemExists )
+//					{
+//						if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Added )
+//							images[ 0 ] = EditorResourcesCache.AddCircle_32;
+//						else if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Deleted )
+//							images[ 0 ] = EditorResourcesCache.DeleteCircle_32;
+//						else
+//						{
+//							var modified = false;
+//							if( serverStateItem != null )
+//							{
+//								//check for modified data of the file
+//								var iconsItem = RepositoryIconCache.GetFileItem( projectFileName );
+//								var equal = iconsItem != null && serverStateItem.Length == iconsItem.Length && serverStateItem.Hash == iconsItem.Hash;
+//								if( !equal )
+//									modified = true;
 
-								//changed sync mode is also considered as modified
-								if( localSyncMode.HasValue && serverStateItem.SyncMode != localSyncMode.Value )
-									modified = true;
-							}
+//								//changed sync mode is also considered as modified
+//								if( localSyncMode.HasValue && serverStateItem.SyncMode != localSyncMode.Value )
+//									modified = true;
+//							}
 
-							if( modified )
-								images[ 0 ] = EditorResourcesCache.Warning_32;
-							else
-							{
-								var syncMode = RepositorySyncMode.Synchronize;
-								if( localSyncMode.HasValue )
-									syncMode = localSyncMode.Value;
-								else if( serverStateItem != null )
-									syncMode = serverStateItem.SyncMode;
+//							if( modified )
+//								images[ 0 ] = EditorResourcesCache.Warning_32;
+//							else
+//							{
+//								var syncMode = RepositorySyncMode.Synchronize;
+//								if( localSyncMode.HasValue )
+//									syncMode = localSyncMode.Value;
+//								else if( serverStateItem != null )
+//									syncMode = serverStateItem.SyncMode;
 
-								if( syncMode == RepositorySyncMode.ServerOnly )
-									images[ 0 ] = EditorResourcesCache.ServerOnly_32;
-								else
-									images[ 0 ] = EditorResourcesCache.CheckedCircle_32;
-							}
-						}
-					}
-					else
-						images[ 0 ] = EditorResourcesCache.NotAdded_32;
+//								if( syncMode == RepositorySyncMode.ServerOnly )
+//									images[ 0 ] = EditorResourcesCache.ServerOnly_32;
+//								else
+//									images[ 0 ] = EditorResourcesCache.CheckedCircle_32;
+//							}
+//						}
+//					}
+//					else
+//						images[ 0 ] = EditorResourcesCache.NotAdded_32;
 
 
-					//if( serverStateItem != null || localItemExists )
-					//{
-					//!!!!может _16 тоже
+//					//if( serverStateItem != null || localItemExists )
+//					//{
+//					//!!!!может _16 тоже
 
-					//var images = new Image[ 2 ];
+//					//var images = new Image[ 2 ];
 
-					//if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Added )
-					//	images[ 0 ] = EditorResourcesCache.AddCircle_32;
-					//else if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Deleted )
-					//	images[ 0 ] = EditorResourcesCache.DeleteCircle_32;
-					//else
-					//{
-					//	var modified = false;
-					//	if( serverStateItem != null )
-					//	{
-					//		var iconsItem = RepositoryIconCache.GetFileItem( projectFileName );
-					//		var equal = iconsItem != null && serverStateItem.Length == iconsItem.Length && serverStateItem.Hash == iconsItem.Hash;
-					//		if( !equal )
-					//			modified = true;
-					//	}
-					//	images[ 0 ] = modified ? EditorResourcesCache.Warning_32 : EditorResourcesCache.CheckedCircle_32;
-					//}
+//					//if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Added )
+//					//	images[ 0 ] = EditorResourcesCache.AddCircle_32;
+//					//else if( localStatus.HasValue && localStatus.Value == RepositoryLocal.Status.Deleted )
+//					//	images[ 0 ] = EditorResourcesCache.DeleteCircle_32;
+//					//else
+//					//{
+//					//	var modified = false;
+//					//	if( serverStateItem != null )
+//					//	{
+//					//		var iconsItem = RepositoryIconCache.GetFileItem( projectFileName );
+//					//		var equal = iconsItem != null && serverStateItem.Length == iconsItem.Length && serverStateItem.Hash == iconsItem.Hash;
+//					//		if( !equal )
+//					//			modified = true;
+//					//	}
+//					//	images[ 0 ] = modified ? EditorResourcesCache.Warning_32 : EditorResourcesCache.CheckedCircle_32;
+//					//}
 
-					//var syncMode = RepositorySyncMode.Synchronize;
-					//if( localSyncMode.HasValue )
-					//	syncMode = localSyncMode.Value;
-					//else if( serverStateItem != null )
-					//	syncMode = serverStateItem.SyncMode;
+//					//var syncMode = RepositorySyncMode.Synchronize;
+//					//if( localSyncMode.HasValue )
+//					//	syncMode = localSyncMode.Value;
+//					//else if( serverStateItem != null )
+//					//	syncMode = serverStateItem.SyncMode;
 
-					//switch( syncMode )
-					//{
-					////case RepositorySyncMode.StorageOnly: images[ 1 ] = EditorResourcesCache.StorageOnly_32; break;
-					//case RepositorySyncMode.ServerOnly: images[ 1 ] = EditorResourcesCache.ServerOnly_32; break;
-					//}
+//					//switch( syncMode )
+//					//{
+//					////case RepositorySyncMode.StorageOnly: images[ 1 ] = EditorResourcesCache.StorageOnly_32; break;
+//					//case RepositorySyncMode.ServerOnly: images[ 1 ] = EditorResourcesCache.ServerOnly_32; break;
+//					//}
 
-					//return images;
+//					//return images;
 
-					//}
+//					//}
 
-				}
+//				}
 
-				return images;
-			}
-#endif
+//				return images;
+//			}
+//#endif
 
 			return base.GetCornerImages();
 		}

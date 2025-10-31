@@ -875,7 +875,8 @@ namespace NeoAxis
 						//networking: send update to clients
 						if( NetworkIsServer )
 						{
-							var writer = BeginNetworkMessageToEveryone( "UpdateWheels" );
+							var m = BeginNetworkMessageToEveryone( "UpdateWheels" );
+							var writer = m.Writer;
 
 							//!!!!реже высылать, не высылать тоже самое, дискретизация, интерполировать
 
@@ -892,7 +893,7 @@ namespace NeoAxis
 								//!!!!send contact body?
 							}
 
-							EndNetworkMessage();
+							m.End();
 						}
 
 						UpdateAdditionalItems();
@@ -939,11 +940,12 @@ namespace NeoAxis
 						sentToClientsCurrentGear = dynamicData.CurrentGear;
 						sentToClientsCurrentRPM = dynamicData.CurrentRPM;
 
-						var writer = BeginNetworkMessageToEveryone( "MotorState" );
+						var m = BeginNetworkMessageToEveryone( "MotorState" );
+						var writer = m.Writer;
 						writer.Write( MotorOn );
 						writer.WriteVariableInt32( dynamicData.CurrentGear );
 						writer.Write( dynamicData.CurrentRPM );
-						EndNetworkMessage();
+						m.End();
 					}
 				}
 
@@ -2818,12 +2820,13 @@ namespace NeoAxis
 						{
 							if( NetworkIsClient )
 							{
-								var writer = BeginNetworkMessageToServer( "PutObjectToSeat" );
-								if( writer != null )
+								var m = BeginNetworkMessageToServer( "PutObjectToSeat" );
+								if( m != null )
 								{
+									var writer = m.Writer;
 									writer.WriteVariableInt32( seatIndex );
 									writer.WriteVariableUInt64( (ulong)character.NetworkID );
-									EndNetworkMessage();
+									m.End();
 								}
 							}
 							else
@@ -4216,11 +4219,11 @@ namespace NeoAxis
 
 			if( dynamicData != null )
 			{
-				var writer = BeginNetworkMessage( client, "MotorState" );
-				writer.Write( MotorOn );
-				writer.WriteVariableInt32( dynamicData.CurrentGear );
-				writer.Write( dynamicData.CurrentRPM );
-				EndNetworkMessage();
+				var m = BeginNetworkMessage( client, "MotorState" );
+				m.Writer.Write( MotorOn );
+				m.Writer.WriteVariableInt32( dynamicData.CurrentGear );
+				m.Writer.Write( dynamicData.CurrentRPM );
+				m.End();
 			}
 		}
 

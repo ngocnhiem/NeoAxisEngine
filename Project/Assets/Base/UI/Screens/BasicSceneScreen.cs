@@ -194,15 +194,12 @@ namespace Project
 				}
 
 				//chat
-				if( EnabledInHierarchyAndIsInstance )
+				if( SimulationAppClient.Client?.Chat != null )
 				{
-					if( SimulationAppClient.Client != null )
-						SimulationAppClient.Client.Chat.ReceiveText += Chat_ReceiveText;
-				}
-				else
-				{
-					if( SimulationAppClient.Client != null )
-						SimulationAppClient.Client.Chat.ReceiveText -= Chat_ReceiveText;
+					if( EnabledInHierarchyAndIsInstance )
+						SimulationAppClient.Client.Chat.ReceivedRoomMessage += Chat_ReceivedRoomMessage;
+					else
+						SimulationAppClient.Client.Chat.ReceivedRoomMessage -= Chat_ReceivedRoomMessage;
 				}
 			}
 
@@ -623,9 +620,12 @@ namespace Project
 			return base.OnMouseDown( button );
 		}
 
-		protected virtual void Chat_ReceiveText( ClientNetworkService_Chat sender, ClientNetworkService_Users.UserInfo fromUser, string text )
+		private void Chat_ReceivedRoomMessage( ClientNetworkService_Chat sender, ClientNetworkService_Chat.RoomMessage message )
 		{
-			var str = $"{fromUser.Username}: {text}";
+			var user = sender.UsersService.GetUser( message.UserID );
+			var userString = user != null ? user.Username : message.UserID.ToString();
+
+			var str = $"{userString}: {message.Text}";
 			ScreenMessages.Add( str, false );
 		}
 
@@ -881,6 +881,7 @@ namespace Project
 				var networkLogic = NetworkLogicUtility.GetNetworkLogic( scene );
 				var userService = SimulationAppClient.Client?.Users;
 				var chatService = SimulationAppClient.Client?.Chat;
+				var chatServiceDefaultRoom = chatService?.GetRoom( "Default" );
 
 				var position = viewport.CameraSettings.Position;
 				var radius = DisplayMessagesAboveObjectsVisibilityDistance.Value;
@@ -901,14 +902,14 @@ namespace Project
 						var message = "";
 
 						//get chat message
-						if( networkLogic != null && chatService != null )
+						if( networkLogic != null && chatServiceDefaultRoom != null )
 						{
 							var referenceToObject = "root:" + obj.GetPathFromRoot();
 							var user = userService.GetUserByObjectControlledByPlayer( referenceToObject );
 							if( user != null )
 							{
-								var lastMessage = chatService.GetLastMessageFromUser( user );
-								if( lastMessage != null && EngineApp.EngineTime - lastMessage.Time < DisplayMessagesAboveObjectsTime )
+								var lastMessage = chatService.GetLastRoomMessageFromUser( chatServiceDefaultRoom, user.UserID );
+								if( lastMessage != null && EngineApp.EngineTime - lastMessage.ReceivedEngineTime < DisplayMessagesAboveObjectsTime )
 									message = lastMessage.Text;
 							}
 						}

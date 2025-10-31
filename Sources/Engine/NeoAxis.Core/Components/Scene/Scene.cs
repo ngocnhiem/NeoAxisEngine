@@ -27,6 +27,7 @@ namespace NeoAxis
 		double initTime;
 		Bounds boundsWhenSimulationStarted;
 
+		//background sound
 		Sound backgroundSoundCurrent;
 		SoundData backgroundSoundInstance;
 		SoundVirtualChannel backgroundSoundChannel;
@@ -3224,6 +3225,12 @@ namespace NeoAxis
 			//	backgroundSoundChannel?.Stop();
 			//	backgroundSoundChannel = null;
 			//}
+		}
+
+		[Browsable( false )]
+		public SoundVirtualChannel BackgroundSoundChannel
+		{
+			get { return backgroundSoundChannel; }
 		}
 
 		public Vector2 GetWindSpeedVector()

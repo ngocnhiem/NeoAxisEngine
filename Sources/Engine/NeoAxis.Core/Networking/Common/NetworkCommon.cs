@@ -1,6 +1,7 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace NeoAxis
 {
@@ -11,9 +12,43 @@ namespace NeoAxis
 		Connected,
 	}
 
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	public class NetworkAggregateConnectionStatistics
+	{
+		long sent;
+		long received;
+
+		public void AddSent( long value )
+		{
+			Interlocked.Add( ref sent, value );
+		}
+
+		public void AddReceived( long value )
+		{
+			Interlocked.Add( ref received, value );
+		}
+
+		public long GetSent( bool reset = false )
+		{
+			if( reset )
+				return Interlocked.Exchange( ref sent, 0 );
+			else
+				return Interlocked.Read( ref sent );
+		}
+
+		public long GetReceived( bool reset = false )
+		{
+			if( reset )
+				return Interlocked.Exchange( ref received, 0 );
+			else
+				return Interlocked.Read( ref received );
+		}
+	}
+
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	[AttributeUsage( /*AttributeTargets.Class |*/ AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false )]
+	[AttributeUsage( AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false )]
 	public class NetworkSynchronizeAttribute : Attribute
 	{
 		bool networkMode;
@@ -29,21 +64,10 @@ namespace NeoAxis
 		}
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	class NetworkUtility
+	class NetworkUtilityInternal
 	{
 		public static Metadata.GetMembersContext metadataGetMembersContextNoFilter = new Metadata.GetMembersContext( false );
-
-		public static string FormatSize( long byteCount )
-		{
-			//copyright: from LiteDB
-			var suf = new[] { "B", "KB", "MB", "GB", "TB" }; //Longs run out around EB
-			if( byteCount == 0 ) return "0 " + suf[ 0 ];
-			var bytes = Math.Abs( byteCount );
-			var place = Convert.ToInt64( Math.Floor( Math.Log( bytes, 1024 ) ) );
-			var num = Math.Round( bytes / Math.Pow( 1024, place ), 1 );
-			return ( Math.Sign( byteCount ) * num ).ToString() + " " + suf[ place ];
-		}
 	}
 }

@@ -10,6 +10,7 @@ using System.Threading;
 using NeoAxis.Editor;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using NeoAxis.Networking;
 
 namespace NeoAxis
 {
@@ -4758,51 +4759,88 @@ again:;
 		//!!!!может указывать long userID
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArrayDataWriter BeginNetworkMessage( IList<ServerNetworkService_Components.ClientItem> recipients, string message )
+		public ServerService.BeginMessageContext BeginNetworkMessage( IList<ServerNetworkService_Components.ClientItem> recipients, string message )
 		{
 			return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, recipients, null, null, null, false, message );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArrayDataWriter BeginNetworkMessage( ServerNetworkService_Components.ClientItem recipient, string message )
+		public ServerService.BeginMessageContext BeginNetworkMessage( ServerNetworkService_Components.ClientItem recipient, string message )
 		{
 			return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, recipient, null, null, false, message );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArrayDataWriter BeginNetworkMessage( IList<ServerNetworkService_Users.UserInfo> recipients, string message )
+		public ServerService.BeginMessageContext BeginNetworkMessage( IList<ServerNetworkService_Users.UserInfo> recipients, string message )
 		{
 			return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, null, recipients, null, false, message );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArrayDataWriter BeginNetworkMessage( ServerNetworkService_Users.UserInfo recipient, string message )
+		public ServerService.BeginMessageContext BeginNetworkMessage( ServerNetworkService_Users.UserInfo recipient, string message )
 		{
 			return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, null, null, recipient, false, message );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArrayDataWriter BeginNetworkMessageToEveryone( string message )
+		public ServerService.BeginMessageContext BeginNetworkMessageToEveryone( string message )
 		{
 			return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, null, null, null, true, message );
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public ArrayDataWriter BeginNetworkMessageToServer( string message )
+		public ClientService.BeginMessageContext BeginNetworkMessageToServer( string message )
 		{
 			return ParentRoot.HierarchyController?.networkClientInterface?.PerformBeginNetworkMessage( this, message );
 		}
 
-		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		public void EndNetworkMessage()
-		{
-			var controller = ParentRoot.HierarchyController;
-			if( controller != null )
-			{
-				controller.networkServerInterface?.PerformEndNetworkMessage();
-				controller.networkClientInterface?.PerformEndNetworkMessage();
-			}
-		}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public ArrayDataWriter BeginNetworkMessage( IList<ServerNetworkService_Components.ClientItem> recipients, string message )
+		//{
+		//	return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, recipients, null, null, null, false, message );
+		//}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public ArrayDataWriter BeginNetworkMessage( ServerNetworkService_Components.ClientItem recipient, string message )
+		//{
+		//	return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, recipient, null, null, false, message );
+		//}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public ArrayDataWriter BeginNetworkMessage( IList<ServerNetworkService_Users.UserInfo> recipients, string message )
+		//{
+		//	return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, null, recipients, null, false, message );
+		//}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public ArrayDataWriter BeginNetworkMessage( ServerNetworkService_Users.UserInfo recipient, string message )
+		//{
+		//	return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, null, null, recipient, false, message );
+		//}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public ArrayDataWriter BeginNetworkMessageToEveryone( string message )
+		//{
+		//	return ParentRoot.HierarchyController?.networkServerInterface?.PerformBeginNetworkMessage( this, null, null, null, null, true, message );
+		//}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public ArrayDataWriter BeginNetworkMessageToServer( string message )
+		//{
+		//	return ParentRoot.HierarchyController?.networkClientInterface?.PerformBeginNetworkMessage( this, message );
+		//}
+
+		//[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		//public void EndNetworkMessage()
+		//{
+		//	var controller = ParentRoot.HierarchyController;
+		//	if( controller != null )
+		//	{
+		//		controller.networkServerInterface?.PerformEndNetworkMessage();
+		//		controller.networkClientInterface?.PerformEndNetworkMessage();
+		//	}
+		//}
 
 		//
 

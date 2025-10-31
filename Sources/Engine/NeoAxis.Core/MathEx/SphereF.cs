@@ -27,8 +27,14 @@ namespace NeoAxis
 
 		public SphereF( Vector3F center, float radius )
 		{
-			this.Center = center;
-			this.Radius = radius;
+			Center = center;
+			Radius = radius;
+		}
+
+		public SphereF( float centerX, float centerY, float centerZ, float radius )
+		{
+			Center = new Vector3F( centerX, centerY, centerZ );
+			Radius = radius;
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]

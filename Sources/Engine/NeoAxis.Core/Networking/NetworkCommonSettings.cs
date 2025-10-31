@@ -9,45 +9,13 @@ namespace NeoAxis.Networking
 {
 	public static class NetworkCommonSettings
 	{
-		public static string CloudServiceHost { get; set; } = "neoaxis.cloud";
-		public static string CloudServiceStorage { get; set; } = "https://neoaxis.us-east-1.linodeobjects.com/";
-		//static string cloudServiceAddress;
-
-		//internal const int GeneralManagerHttpPort = 443;
-		internal const int GeneralManagerHttpPort = 44317;
-		public const int GeneralManagerClientPort = 56566;
-		//public const string GeneralManagerURL = @"http://localhost:44317";
-		//public const string GeneralManagerAddress = "localhost";
-		//public const int GeneralManagerPort = 56566;
-
-		public const int ProjectManagerTimeout = 10000;
-		public const int ProjectCommitPort = 56568;
-		public const int ProjectEnteringPort = 56569;
-
-		//!!!!
-		public const int P2PDefaultSeederPort = 56571;
+		public static string GeneralManagerDomain { get; set; } = "cloud.neoaxis.com";
+		public static string GeneralManagerAddress { get; set; } = "195.200.29.132";
+		public static int GeneralManagerHttpsPort = 44318; //internal const int GeneralManagerHttpPort = 44317;
+		public static int GeneralManagerExecuteCommandTimeout = 120000;// 30000;
 
 		public static bool NetworkLogging { get; set; }
 
-		///////////////////////////////////////////////
-
-		//public static string CloudServiceAddress
-		//{
-		//	get
-		//	{
-		//		if( cloudServiceAddress == null )
-		//		{
-		//			//to change address add to NeoAxis.DefaultSettings.config:
-		//			//CloudServiceAddress = "https://neoaxis.us-east-1.linodeobjects.com/"
-
-		//			var result = VirtualFileSystem.DefaultSettingsConfig?.GetAttribute( "CloudServiceAddress" );
-		//			if( string.IsNullOrEmpty( result ) )
-		//				result = "https://neoaxis.us-east-1.linodeobjects.com/";
-
-		//			cloudServiceAddress = result;
-		//		}
-		//		return cloudServiceAddress;
-		//	}
-		//}
+		//public const int P2PDefaultSeederPort = 56571;
 	}
 }

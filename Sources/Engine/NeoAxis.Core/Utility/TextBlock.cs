@@ -16,12 +16,12 @@ namespace NeoAxis
 		string name;
 		string data;
 
-		//TO DO: create lists by request
-		//!!!!!EDictionary? для атрибутов - норм вроде. но имена чилдов пересекаться.
 		List<TextBlock> children = new List<TextBlock>();
 		ReadOnlyCollection<TextBlock> childrenAsReadOnly;
+
 		List<Attribute> attributes = new List<Attribute>();
 		ReadOnlyCollection<Attribute> attributesAsReadOnly;
+		Dictionary<string, Attribute> attributeByName;
 
 		//
 
@@ -128,7 +128,7 @@ namespace NeoAxis
 		/// </summary>
 		/// <param name="name">The block name.</param>
 		/// <returns><see cref="NeoAxis.TextBlock"/> if the block has been exists; otherwise, <b>null</b>.</returns>
-		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		[MethodImpl( (MethodImplOptions)512 )]
 		public TextBlock FindChild( string name )
 		{
 			for( int n = 0; n < children.Count; n++ )
@@ -186,10 +186,6 @@ namespace NeoAxis
 		{
 			var result = children.Remove( child );
 			child.parent = null;
-			//child.name = "";
-			//child.data = "";
-			//child.children = null;
-			//child.attributes = null;
 			return result;
 		}
 
@@ -199,27 +195,25 @@ namespace NeoAxis
 		/// <param name="name">The attribute name.</param>
 		/// <param name="defaultValue">Default value. If the attribute does not exist that this value will return.</param>
 		/// <returns>The attribute value if the attribute exists; otherwise, default value.</returns>
-		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		[MethodImpl( (MethodImplOptions)512 )]
 		public string GetAttribute( string name, string defaultValue = "" )
 		{
-			for( int n = 0; n < attributes.Count; n++ )
+			if( attributeByName != null )
 			{
-				var attribute = attributes[ n ];
-				if( attribute.Name == name )
-					return attribute.Value;
+				if( attributeByName.TryGetValue( name, out var a ) )
+					return a.value;
+			}
+			else
+			{
+				for( int n = 0; n < attributes.Count; n++ )
+				{
+					var attribute = attributes[ n ];
+					if( attribute.Name == name )
+						return attribute.Value;
+				}
 			}
 			return defaultValue;
 		}
-
-		///// <summary>
-		///// Returns the attribute value by name.
-		///// </summary>
-		///// <param name="name">The attribute name.</param>
-		///// <returns>The attribute value if the attribute exists; otherwise, empty string.</returns>
-		//public string GetAttribute( string name )
-		//{
-		//	return GetAttribute( name, "" );
-		//}
 
 		/// <summary>
 		/// Gets the attributes collection.
@@ -234,16 +228,21 @@ namespace NeoAxis
 		/// </summary>
 		/// <param name="name">The attribute name.</param>
 		/// <returns><b>true</b> if the block exists; otherwise, <b>false</b>.</returns>
-		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		[MethodImpl( (MethodImplOptions)512 )]
 		public bool AttributeExists( string name )
 		{
-			for( int n = 0; n < attributes.Count; n++ )
+			if( attributeByName != null )
+				return attributeByName.ContainsKey( name );
+			else
 			{
-				var attribute = attributes[ n ];
-				if( attribute.Name == name )
-					return true;
+				for( int n = 0; n < attributes.Count; n++ )
+				{
+					var attribute = attributes[ n ];
+					if( attribute.Name == name )
+						return true;
+				}
+				return false;
 			}
-			return false;
 		}
 
 		/// <summary>
@@ -259,19 +258,46 @@ namespace NeoAxis
 			if( value == null )
 				throw new Exception( "AddChild: \"value\" is null." );
 
-			for( int n = 0; n < attributes.Count; n++ )
+			if( attributeByName != null )
 			{
-				Attribute attribute = attributes[ n ];
-				if( attribute.Name == name )
+				if( attributeByName.TryGetValue( name, out var a2 ) )
 				{
-					attribute.value = value;
+					a2.value = value;
 					return;
 				}
 			}
+			else
+			{
+				for( int n = 0; n < attributes.Count; n++ )
+				{
+					var attribute = attributes[ n ];
+					if( attribute.Name == name )
+					{
+						attribute.value = value;
+						return;
+					}
+				}
+			}
+
 			var a = new Attribute();
 			a.name = name;
 			a.value = value;
 			attributes.Add( a );
+
+			if( attributes.Count > 3 )
+			{
+				if( attributeByName != null )
+					attributeByName[ a.Name ] = a;
+				else
+				{
+					attributeByName = new Dictionary<string, Attribute>( 16 );
+					for( int n = 0; n < attributes.Count; n++ )
+					{
+						var attribute = attributes[ n ];
+						attributeByName[ attribute.Name ] = attribute;
+					}
+				}
+			}
 		}
 
 		/// <summary>
@@ -285,10 +311,8 @@ namespace NeoAxis
 			{
 				if( name == attributes[ n ].name )
 				{
-					//Attribute attribute = attributes[ n ];
-					//attribute.name = "";
-					//attribute.value = "";
 					attributes.RemoveAt( n );
+					attributeByName?.Remove( name );
 					return true;
 				}
 			}
@@ -302,6 +326,7 @@ namespace NeoAxis
 		public void DeleteAllAttributes()
 		{
 			attributes.Clear();
+			attributeByName = null;
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
@@ -374,12 +399,6 @@ namespace NeoAxis
 					}
 					else
 						builder.Append( Name );
-					//string v;
-					//if( IsNeedQuotesForLexeme( Name, false ) )
-					//	v = string.Format( "\"{0}\"", StringUtility.EncodeDelimiterFormatString( Name ) );
-					//else
-					//	v = Name;
-					//builder.Append( v );
 				}
 
 				if( !string.IsNullOrEmpty( Data ) )
@@ -394,12 +413,6 @@ namespace NeoAxis
 					}
 					else
 						builder.Append( Data );
-					//string v;
-					//if( IsNeedQuotesForLexeme( Data, false ) )
-					//	v = string.Format( "\"{0}\"", StringUtility.EncodeDelimiterFormatString( Data ) );
-					//else
-					//	v = Data;
-					//builder.Append( v );
 				}
 
 				builder.Append( "\r\n" );
@@ -408,7 +421,7 @@ namespace NeoAxis
 				builder.Append( "{\r\n" );
 			}
 
-			for( int nAttribute = 0; nAttribute < attributes.Count; nAttribute++ ) //foreach( Attribute attribute in attributes )
+			for( int nAttribute = 0; nAttribute < attributes.Count; nAttribute++ )
 			{
 				var attribute = attributes[ nAttribute ];
 
@@ -439,33 +452,10 @@ namespace NeoAxis
 					builder.Append( attribute.Value );
 
 				builder.Append( "\r\n" );
-
-
-				//string name;
-				//string value;
-
-				//if( IsNeedQuotesForLexeme( attribute.Name, false ) )
-				//	name = string.Format( "\"{0}\"", StringUtility.EncodeDelimiterFormatString( attribute.Name ) );
-				//else
-				//	name = attribute.Name;
-
-				//if( IsNeedQuotesForLexeme( attribute.Value, true ) )
-				//	value = string.Format( "\"{0}\"", StringUtility.EncodeDelimiterFormatString( attribute.Value ) );
-				//else
-				//	value = attribute.Value;
-
-				//if( userFriendly )
-				//{
-				//	builder.Append( tabPrefix );
-				//	builder.Append( tabLevel != -1 ? "\t" : "" );
-				//}
-				//builder.AppendFormat( "{0} = {1}\r\n", name, value );
 			}
 
 			for( int nChild = 0; nChild < children.Count; nChild++ )
 				children[ nChild ].DumpToString( builder, userFriendly, tabLevel + 1 );
-			//foreach( TextBlock child in children )
-			//	child.DumpToString( builder, userFriendly, tabLevel + 1 );
 
 			if( !string.IsNullOrEmpty( Name ) )
 			{
@@ -583,6 +573,65 @@ namespace NeoAxis
 				error = string.Format( "{0} (line - {1})", str, linePosition );
 		}
 
+		//Copy from StringUtility
+		static void DecodeDelimiterFormatString( StringBuilder outBuilder, string text )
+		{
+			for( int n = 0; n < text.Length; n++ )
+			{
+				char c = text[ n ];
+
+				if( c == '\\' )
+				{
+					n++;
+
+					char c2 = text[ n ];
+
+					switch( c2 )
+					{
+					case 'n': outBuilder.Append( '\n' ); break;
+					case 'r': outBuilder.Append( '\r' ); break;
+					case 't': outBuilder.Append( '\t' ); break;
+					case '\'': outBuilder.Append( '\'' ); break;
+					case '"': outBuilder.Append( '"' ); break;
+					case '\\': outBuilder.Append( '\\' ); break;
+
+					case 'x':
+						{
+							if( n + 4 >= text.Length )
+								throw new Exception( "Invalid string format" );
+
+							int[] values = new int[ 4 ];
+							for( int z = 0; z < 4; z++ )
+							{
+								char cc = text[ n + 1 + z ];
+
+								if( cc >= '0' && cc <= '9' )
+									values[ z ] = (int)cc - (int)'0';
+								else if( cc >= 'a' && cc <= 'f' )
+									values[ z ] = 10 + (int)cc - (int)'a';
+								else if( cc >= 'A' && cc <= 'F' )
+									values[ z ] = 10 + (int)cc - (int)'A';
+								else
+									throw new Exception( "Invalid string format" );
+							}
+
+							int unicodeChar = ( ( values[ 0 ] * 16 + values[ 1 ] ) * 16 +
+								values[ 2 ] ) * 16 + values[ 3 ];
+
+							outBuilder.Append( (char)unicodeChar );
+
+							n += 4;
+						}
+						break;
+
+					default: throw new Exception( "Invalid string format" );
+					}
+				}
+				else
+					outBuilder.Append( c );
+			}
+		}
+
 		[MethodImpl( (MethodImplOptions)512 )]
 		string GetLexeme( bool stopOnlyAtSeparatorOrQuotes, out bool intoQuotes )
 		{
@@ -592,7 +641,6 @@ namespace NeoAxis
 				throw new Exception( "GetLexeme: lexStringBuilderInUse == True." );
 			var lex = lexStringBuilder;
 			lexStringBuilderInUse = true;
-			//StringBuilder lex = new StringBuilder( 32 );
 			lex.Length = 0;
 
 			try
@@ -732,8 +780,8 @@ namespace NeoAxis
 										ss += c2;
 									}
 								}
-								StringUtility.DecodeDelimiterFormatString( lex, ss );
-								//lex.Append( StringUtils.DecodeDelimiterFormatString( ss ) );
+								DecodeDelimiterFormatString( lex, ss );
+								//StringUtility.DecodeDelimiterFormatString( lex, ss );
 								continue;
 							}
 							else if( c == '"' )
@@ -772,7 +820,7 @@ namespace NeoAxis
 			{
 				bool lexIntoQuotes;
 				string lex = GetLexeme( false, out lexIntoQuotes );
-				if( lex.Length == 0 )//if( lex == "" )
+				if( lex.Length == 0 )
 				{
 					if( ifEmptyLexReturnTrue )
 						return true;
@@ -785,7 +833,7 @@ namespace NeoAxis
 					return true;
 
 				string lex2 = GetLexeme( false );
-				if( lex2.Length == 0 )//if( lex2 == "" )
+				if( lex2.Length == 0 )
 				{
 					Error( "Unexpected end of file" );
 					return false;
@@ -844,7 +892,6 @@ namespace NeoAxis
 				linePosition = 1;
 				root = new TextBlock();
 				lexStringBuilder = new StringBuilder( 128 );
-				//lexStringBuilder = new StringBuilder( Math.Max( str.Length, 4 ) );
 
 				bool ret = LoadChild( root, true );
 				if( !ret )

@@ -1,13 +1,8 @@
 // Copyright (C) NeoAxis Group Ltd. 8 Copthall, Roseau Valley, 00152 Commonwealth of Dominica.
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Runtime.InteropServices;
-using System.Collections.ObjectModel;
-using System.Reflection;
 using Internal;
-using System.Diagnostics;
-using Microsoft.Win32;
 
 namespace NeoAxis
 {
@@ -31,6 +26,8 @@ namespace NeoAxis
 		static string cpuDescription;
 
 		static float dpiScaleCached;
+
+		static bool? cloudAppContainer;
 
 		//static bool? wine;
 
@@ -454,38 +451,48 @@ namespace NeoAxis
 		//	}
 		//} 
 
-		public static bool AppContainer
+		static bool IsRunningInAppContainerCheckRegistry()
 		{
-			get; set;
+			try
+			{
+				var email = PlatformSpecificUtility.Instance.GetRegistryValue( @"HKEY_CURRENT_USER\SOFTWARE\NeoAxis", "LoginEmail", "" ) as string;
+				if( !string.IsNullOrEmpty( email ) )
+					return false; //not in app container, because registry access is not available
+			}
+			catch { }
+
+			return true;
 		}
 
-		//[DllImport( "kernel32.dll", SetLastError = true, ExactSpelling = true, CharSet = CharSet.Unicode )]
-		//static extern int GetPackageFamilyName( IntPtr hProcess, ref uint packageFamilyNameLength, [Optional] StringBuilder packageFamilyName );
+		public static bool CloudAppContainer
+		{
+			get
+			{
+				if( cloudAppContainer == null )
+				{
+					try
+					{
+						////first way to detect app container
+						//if( CommandLineParameters.TryGetValue( "-appContainer", out var appContainer ) && appContainer == "1" )
+						//	cloudAppContainer = true;
+						//else
+						//	cloudAppContainer = false;
 
-		//public static bool AppContainer
-		//{
-		//	get
-		//	{
-		//		if( appContainer == null )
-		//		{
-		//			appContainer = false;
+						//another way to detect app container. works
+						if( CurrentPlatform == Platform.Windows )
+							cloudAppContainer = IsRunningInAppContainerCheckRegistry();
+						else
+							cloudAppContainer = false;
+					}
+					catch
+					{
+						cloudAppContainer = false;
+					}
+				}
 
-		//			try
-		//			{
-		//				uint nameLength = 255;
-		//				var familyName = new StringBuilder( 256 );
-		//				if( GetPackageFamilyName( Process.GetCurrentProcess().Handle, ref nameLength, familyName ) == 0 )
-		//				{
-		//					//!!!!
-		//					appContainer = true;
-		//				}
-		//			}
-		//			catch { }
-		//		}
-
-		//		return appContainer.Value;
-		//	}
-		//}
+				return cloudAppContainer.Value;
+			}
+		}
 
 		public static bool? DarkModeOverride { get; set; }
 
@@ -522,7 +529,14 @@ namespace NeoAxis
 			{
 				if( string.IsNullOrEmpty( cpuDescription ) )
 				{
-					cpuDescription = OgreNativeWrapper.GetGlobalParameter( "CPU_ID" );
+					try
+					{
+						cpuDescription = OgreNativeWrapper.GetGlobalParameter( "CPU_ID" );
+					}
+					catch
+					{
+						cpuDescription = "Unknown";
+					}
 
 					unsafe
 					{

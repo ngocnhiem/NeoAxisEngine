@@ -246,12 +246,12 @@ namespace NeoAxis
 							{
 								if( NetworkIsClient )
 								{
-									var writer = BeginNetworkMessageToServer( "RemoveObjectFromSeat" );
-									if( writer != null )
+									var m = BeginNetworkMessageToServer( "RemoveObjectFromSeat" );
+									if( m != null )
 									{
-										writer.WriteVariableUInt64( (ulong)seat.NetworkID );
-										writer.WriteVariableInt32( seatIndex );
-										EndNetworkMessage();
+										m.Writer.WriteVariableUInt64( (ulong)seat.NetworkID );
+										m.Writer.WriteVariableInt32( seatIndex );
+										m.End();
 									}
 								}
 								else
@@ -453,9 +453,10 @@ namespace NeoAxis
 						//!!!!pack lookTo
 
 
-						var writer = BeginNetworkMessageToServer( "UpdateObjectControlCharacter" );
-						if( writer != null )
+						var m = BeginNetworkMessageToServer( "UpdateObjectControlCharacter" );
+						if( m != null )
 						{
+							var writer = m.Writer;
 							writer.Write( character.AllowLookToBackWhenNoActiveItem );
 							writer.Write( character.MoveVector.ToVector2H() );
 							writer.Write( character.MoveVectorRun );
@@ -486,7 +487,7 @@ namespace NeoAxis
 									writer.Write( character.RequiredLookToPosition.Value );
 							}
 
-							EndNetworkMessage();
+							m.End();
 						}
 					}
 				}

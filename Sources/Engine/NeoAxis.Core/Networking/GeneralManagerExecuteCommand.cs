@@ -14,18 +14,28 @@ namespace NeoAxis.Networking
 	public class GeneralManagerExecuteCommand
 	{
 		static HttpClient httpClient;
-		//static string generalManagerAddressCached;
 
 		public string FunctionName = "";
 		public bool RequireUserLogin;
-		public List<(string, string)> Parameters = new List<(string, string)>();
+		public string ServerCheckCode;
+		public List<ParameterItem> Parameters = new List<ParameterItem>();
 		public RequestMethodEnum RequestMethod;
 		public byte[] ContentData;
 		public object Tag;
+		public int? Timeout;
 
 		public volatile ResultClass Result;
 
 		ThreadItem currentThread;
+
+		///////////////////////////////////////////////
+
+		public class ParameterItem
+		{
+			public string Name;
+			public string Value;
+			public bool EncodeBase64Url;
+		}
 
 		///////////////////////////////////////////////
 
@@ -66,46 +76,77 @@ namespace NeoAxis.Networking
 
 		///////////////////////////////////////////////
 
+		public class ResultDownloadFileClass
+		{
+			public string Error = "";
+			//public DateTime TimeCreated;
+		}
+
+		///////////////////////////////////////////////
+
 		void ThreadFunction( object threadItem2 )
 		{
 			ThreadItem threadItem = (ThreadItem)threadItem2;
 
 			try
 			{
-				////get GeneralManager address
-				//if( string.IsNullOrEmpty( generalManagerAddressCached ) )
-				//	generalManagerAddressCached = GeneralManagerFunctions.RequestGeneralManagerAddress( out var error2 );
-
-				var url = string.Format( @"{0}/{1}/", GeneralManagerFunctions.GetHttpURL( NetworkCommonSettings.CloudServiceHost ), FunctionName );
-				//var url = string.Format( @"{0}/{1}/", GeneralManagerFunctions.GetHttpURL( generalManagerAddressCached ), FunctionName );
+				var url = string.Format( @"{0}/{1}/", GeneralManagerFunctions.GetHttpURL(), FunctionName );
 
 				var paramsAdded = false;
 
 				if( RequireUserLogin )
 				{
-					if( !LoginUtility.GetCurrentLicense( out string email, out string hash ) )
-						throw new Exception( "Please login to process." );
+					if( !string.IsNullOrEmpty( CloudClientProcessUtility.LoginForSecureMode ) )
+					{
+						//for secure mode use login and verification code from command line
+						var email64 = StringUtility.EncodeToBase64URL( CloudClientProcessUtility.LoginForSecureMode );
+						var hash64 = StringUtility.EncodeToBase64URL( CloudClientProcessUtility.VerificationCodeForSecureMode );
+						url += $"?user={email64}&hash_code_for_secure_mode={hash64}";
+					}
+					else
+					{
+						if( !LoginUtility.GetCurrentLicense( out string email, out string hash ) )
+							throw new Exception( "Please login to process." );
 
-					var email64 = StringUtility.EncodeToBase64URL( email );
-					var hash64 = StringUtility.EncodeToBase64URL( hash );
-					url += $"?user={email64}&hash={hash64}";
+						var email64 = StringUtility.EncodeToBase64URL( email );
+						var hash64 = StringUtility.EncodeToBase64URL( hash );
+						url += $"?user={email64}&hash={hash64}";
+					}
 
 					paramsAdded = true;
 				}
+
+				//if( !string.IsNullOrEmpty( ServerCheckCode ) )
+				//{
+				//	url += paramsAdded ? "&" : "?";
+				//	url += $"server_check_code={ServerCheckCode}";
+				//	paramsAdded = true;
+				//}
 
 				foreach( var param in Parameters )
 				{
-					var param64 = StringUtility.EncodeToBase64URL( param.Item2 );
-
-					url += paramsAdded ? "&" : "?";
-					url += $"{param.Item1}={param64}";
-
+					if( param.EncodeBase64Url )
+					{
+						var param64 = StringUtility.EncodeToBase64URL( param.Value );
+						url += paramsAdded ? "&" : "?";
+						url += $"{param.Name}={param64}";
+					}
+					else
+					{
+						url += paramsAdded ? "&" : "?";
+						url += $"{param.Name}={param.Value}";
+					}
 					paramsAdded = true;
 				}
 
-
 				var request = (HttpWebRequest)WebRequest.Create( url );
-				request.Timeout = NetworkCommonSettings.ProjectManagerTimeout;
+				if( Timeout != null )
+					request.Timeout = Timeout.Value;
+				else
+					request.Timeout = NetworkCommonSettings.GeneralManagerExecuteCommandTimeout;
+
+				if( !string.IsNullOrEmpty( ServerCheckCode ) )
+					request.Headers[ "Authorization" ] = "Bearer " + ServerCheckCode;
 
 				if( RequestMethod == RequestMethodEnum.Post )
 				{
@@ -118,18 +159,9 @@ namespace NeoAxis.Networking
 					dataStream.Close();
 				}
 
-				//if( ContentData != null )
-				//{
-				//	request.Method = "POST";
-				//	request.ContentLength = ContentData.Length;
-				//	request.ContentType = "application/x-www-form-urlencoded";
-				//	var dataStream = request.GetRequestStream();
-				//	dataStream.Write( ContentData, 0, ContentData.Length );
-				//	dataStream.Close();
-				//}
-
-
 				string blockString = "";
+
+				//!!!!can freeze?
 
 				using( var response = (HttpWebResponse)request.GetResponse() )
 				using( var stream = response.GetResponseStream() )
@@ -210,124 +242,207 @@ namespace NeoAxis.Networking
 			currentThread = null;
 		}
 
-		static async Task<string> SendRequestAsync( string url, RequestMethodEnum requestMethod, byte[] contentData )
+		async Task<string> SendRequestAsync( string url, RequestMethodEnum requestMethod, byte[] contentData, string login, string password, string serverCheckCode, CancellationToken cancellationToken = default )
 		{
 			if( httpClient == null )
 			{
 				httpClient = new HttpClient();
-				httpClient.Timeout = TimeSpan.FromMilliseconds( NetworkCommonSettings.ProjectManagerTimeout );
+				httpClient.Timeout = TimeSpan.FromMilliseconds( NetworkCommonSettings.GeneralManagerExecuteCommandTimeout );
 			}
 
-			HttpResponseMessage response;
-
-			if( requestMethod == RequestMethodEnum.Post )
+			var useNewClient = Timeout != null;
+			var client = useNewClient ? new HttpClient() : httpClient;
+			try
 			{
-				var content = new ByteArrayContent( contentData ?? new byte[ 0 ] );
-				content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
-				response = await httpClient.PostAsync( url, content );
+				if( useNewClient )
+				{
+					if( Timeout != null )
+						client.Timeout = TimeSpan.FromMilliseconds( Timeout.Value );
+				}
+
+				//!!!!not implemented
+				//if( !string.IsNullOrEmpty( login ) )
+				//{
+				//	// Create the Basic Authentication header
+				//	var byteArray = Encoding.UTF8.GetBytes( $"{login}:{password}" );
+				//	var authHeader = Convert.ToBase64String( byteArray );
+				//	httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", authHeader );
+				//}
+
+
+				var request = new HttpRequestMessage( requestMethod == RequestMethodEnum.Post ? HttpMethod.Post : HttpMethod.Get, url );
+				if( !string.IsNullOrEmpty( serverCheckCode ) )
+					request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Bearer", serverCheckCode );
+				if( requestMethod == RequestMethodEnum.Post )
+				{
+					request.Content = new ByteArrayContent( contentData ?? new byte[ 0 ] );
+					request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
+				}
+
+				var response = await client.SendAsync( request, cancellationToken );
+
+				response.EnsureSuccessStatusCode();
+
+				string blockString = await response.Content.ReadAsStringAsync( cancellationToken );
+				return blockString;
+
+
+
+				//HttpResponseMessage response;
+				//if( requestMethod == RequestMethodEnum.Post )
+				//{
+				//	var content = new ByteArrayContent( contentData ?? new byte[ 0 ] );
+				//	content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
+				//	response = await client.PostAsync( url, content, cancellationToken );
+				//}
+				//else
+				//	response = await client.GetAsync( url, cancellationToken );
+
+				//response.EnsureSuccessStatusCode();
+
+				//string blockString = await response.Content.ReadAsStringAsync( cancellationToken );
+				//return blockString;
 			}
-			else
-				response = await httpClient.GetAsync( url );
+			finally
+			{
+				if( useNewClient )
+					client.Dispose();
+			}
 
-			//if( contentData != null )
-			//{
-			//	var content = new ByteArrayContent( contentData );
-			//	content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
-			//	response = await httpClient.PostAsync( url, content );
-			//}
+
+			//var request = (HttpWebRequest)WebRequest.Create( url );
+
+			//if( Timeout != null )
+			//	request.Timeout = Timeout.Value;
 			//else
-			//	response = await httpClient.GetAsync( url );
+			//	request.Timeout = NetworkCommonSettings.GeneralManagerExecuteCommandTimeout;
 
-			response.EnsureSuccessStatusCode();
-
-			string blockString = await response.Content.ReadAsStringAsync();
-			return blockString;
-
-			//HttpContent content = null;
-			//if( postContentData != null )
+			//if( RequestMethod == RequestMethodEnum.Post )
 			//{
-			//	content = new ByteArrayContent( postContentData );
-			//	content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
+			//	request.Method = "POST";
+			//	request.ContentLength = contentData.Length;
+			//	request.ContentType = "application/x-www-form-urlencoded";
+
+			//	//!!!!пишет тут сразу весь контент в стрим
+
+			//	var dataStream = request.GetRequestStream();
+			//	dataStream.Write( contentData, 0, contentData.Length );
+			//	dataStream.Close();
 			//}
 
-			//// Send the request
+			//string blockString = "";
+
+			//using( var response = await request.GetResponseAsync() )
+			//{
+			//	using( var stream = response.GetResponseStream() )
+			//	using( var reader = new StreamReader( stream ) )
+			//		blockString = await reader.ReadToEndAsync();
+			//}
+
+
+			//if( !string.IsNullOrEmpty( login ) )
+			//{
+			//	// Create the Basic Authentication header
+			//	var byteArray = Encoding.UTF8.GetBytes( $"{login}:{password}" );
+			//	var authHeader = Convert.ToBase64String( byteArray );
+			//	httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue( "Basic", authHeader );
+			//}
+
 			//HttpResponseMessage response;
-			//if( postContentData != null )
-			//	response = await httpClient.PostAsync( url, content );
+
+			//if( requestMethod == RequestMethodEnum.Post )
+			//{
+			//	var content = new ByteArrayContent( contentData ?? new byte[ 0 ] );
+			//	content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue( "application/x-www-form-urlencoded" );
+
+			//	response = await httpClient.PostAsync( url, content, cancellationToken );
+			//}
 			//else
-			//	response = await httpClient.GetAsync( url );
+			//	response = await httpClient.GetAsync( url, cancellationToken );
+
 			//response.EnsureSuccessStatusCode();
 
-			//string blockString = await response.Content.ReadAsStringAsync();
+			//string blockString = await response.Content.ReadAsStringAsync( cancellationToken );
 			//return blockString;
 		}
 
-		public async Task<ResultClass> ExecuteAsync()
+		public void AddParameter( string name, string value, bool encodeBase64Url )
+		{
+			var param = new ParameterItem();
+			param.Name = name;
+			param.Value = value;
+			param.EncodeBase64Url = encodeBase64Url;
+			Parameters.Add( param );
+		}
+
+		public async Task<ResultClass> ExecuteAsync( CancellationToken cancellationToken = default )
 		{
 			try
 			{
-				////get GeneralManager address
-				//if( string.IsNullOrEmpty( generalManagerAddressCached ) )
-				//	generalManagerAddressCached = await GeneralManagerFunctions.RequestGeneralManagerAddressAsync();
-
-				var url = string.Format( @"{0}/{1}/", GeneralManagerFunctions.GetHttpURL( NetworkCommonSettings.CloudServiceHost ), FunctionName );
-				//var url = string.Format( @"{0}/{1}/", GeneralManagerFunctions.GetHttpURL( generalManagerAddressCached ), FunctionName );
+				var url = string.Format( @"{0}/{1}/", GeneralManagerFunctions.GetHttpURL(), FunctionName );
 
 				var paramsAdded = false;
 
+				//!!!!impl
+				var login = "";
+				var password = "";
+
 				if( RequireUserLogin )
 				{
-					if( !LoginUtility.GetCurrentLicense( out string email, out string hash ) )
-						throw new Exception( "Please login to process." );
+					if( !string.IsNullOrEmpty( CloudClientProcessUtility.LoginForSecureMode ) )
+					{
+						//for secure mode use login and verification code from command line
+						var email64 = StringUtility.EncodeToBase64URL( CloudClientProcessUtility.LoginForSecureMode );
+						var projectID64 = StringUtility.EncodeToBase64URL( CloudClientProcessUtility.ProjectID.ToString() );
+						var hash64 = StringUtility.EncodeToBase64URL( CloudClientProcessUtility.VerificationCodeForSecureMode );
+						url += $"?user={email64}&project_for_secure_mode={projectID64}&hash_code_for_secure_mode={hash64}";
+					}
+					else
+					{
+						if( !LoginUtility.GetCurrentLicense( out string email, out string hash ) )
+							throw new Exception( "Please login to process." );
 
-					var email64 = StringUtility.EncodeToBase64URL( email );
-					var hash64 = StringUtility.EncodeToBase64URL( hash );
-					url += $"?user={email64}&hash={hash64}";
+						var email64 = StringUtility.EncodeToBase64URL( email );
+						var hash64 = StringUtility.EncodeToBase64URL( hash );
+						url += $"?user={email64}&hash={hash64}";
+					}
 
 					paramsAdded = true;
 				}
+
+				//if( !string.IsNullOrEmpty( ServerCheckCode ) )
+				//{
+				//	url += paramsAdded ? "&" : "?";
+				//	url += $"server_check_code={ServerCheckCode}";
+				//	paramsAdded = true;
+				//}
 
 				foreach( var param in Parameters )
 				{
-					var param64 = StringUtility.EncodeToBase64URL( param.Item2 );
-
-					url += paramsAdded ? "&" : "?";
-					url += $"{param.Item1}={param64}";
-
+					if( param.EncodeBase64Url )
+					{
+						var param64 = StringUtility.EncodeToBase64URL( param.Value );
+						url += paramsAdded ? "&" : "?";
+						url += $"{param.Name}={param64}";
+					}
+					else
+					{
+						url += paramsAdded ? "&" : "?";
+						url += $"{param.Name}={param.Value}";
+					}
 					paramsAdded = true;
 				}
 
-				var blockString = await SendRequestAsync( url, RequestMethod, ContentData );
+				var blockString = await SendRequestAsync( url, RequestMethod, ContentData, login, password, ServerCheckCode, cancellationToken );
 
-				//var request = (HttpWebRequest)WebRequest.Create( url );
-				//request.Timeout = NetworkCommonSettings.ProjectManagerTimeout;
-
-				//if( ContentData != null )
-				//{
-				//	request.Method = "POST";
-				//	request.ContentLength = ContentData.Length;
-				//	request.ContentType = "application/x-www-form-urlencoded";
-				//	var dataStream = request.GetRequestStream();
-				//	dataStream.Write( ContentData, 0, ContentData.Length );
-				//	dataStream.Close();
-				//}
-
-				//string blockString = "";
-
-				//using( var response = (HttpWebResponse)request.GetResponse() )
-				//using( var stream = response.GetResponseStream() )
-				//using( var reader = new StreamReader( stream ) )
-				//	blockString = reader.ReadToEnd();
-
-
-				if( /*threadItem.needStop || */EditorAPI.ClosingApplication )
+				if( EditorAPI.ClosingApplication )
 					throw new Exception( "Closing application." );
 
 				var block = TextBlock.Parse( blockString, out var error );
 				if( !string.IsNullOrEmpty( error ) )
 					throw new Exception( "Error of parsing the response data. " + error );
 
-				if( /*threadItem.needStop || */EditorAPI.ClosingApplication )
+				if( EditorAPI.ClosingApplication )
 					throw new Exception( "Closing application." );
 
 				var result = new ResultClass();
@@ -340,50 +455,14 @@ namespace NeoAxis.Networking
 				result.TimeCreated = DateTime.Now;
 
 				return result;
-				//Result = result;
-
-				//if( threadItem.callProcessedEventFromMainThread )
-				//{
-				//	EngineThreading.ExecuteFromMainThreadLater( delegate ()
-				//	{
-				//		Processed?.Invoke( this );
-				//	} );
-				//}
-				//else
-				//	Processed?.Invoke( this );
 			}
 			catch( Exception e )
 			{
-				//if( /*threadItem.needStop || */EditorAPI.ClosingApplication )
-				//	return;
-
 				var result = new ResultClass();
 				result.Error = e.Message;
 				result.TimeCreated = DateTime.Now;
-
 				return result;
-				//Result = result;
-
-				//if( threadItem.callProcessedEventFromMainThread )
-				//{
-				//	EngineThreading.ExecuteFromMainThreadLater( delegate ()
-				//	{
-				//		Processed?.Invoke( this );
-				//	} );
-				//}
-				//else
-				//	Processed?.Invoke( this );
 			}
 		}
-
-		//public async Task<ResultClass> ExecuteAsync()
-		//{
-		//	BeginExecution( false );
-
-		//	while( Result == null )
-		//		await Task.Delay( 10 );
-
-		//	return Result;
-		//}
 	}
 }

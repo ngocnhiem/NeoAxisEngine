@@ -3,12 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace NeoAxis.Networking
 {
 	public abstract class ClientService
 	{
-		internal const int maxMessageTypeIdentifier = 15;
+		internal const int maxMessageTypeIdentifier = 255;
 
 		//general
 		internal ClientNode owner;
@@ -19,10 +20,8 @@ namespace NeoAxis.Networking
 		Dictionary<string, MessageType> messageTypesByName = new Dictionary<string, MessageType>();
 		List<MessageType> messageTypesByID = new List<MessageType>();
 
-		//send data
-		bool sendingData;
-		int sendingMessageID;
-		ArrayDataWriter sendingDataWriter = new ArrayDataWriter();
+		//optimization
+		BeginMessageContext oneBeginMessage = new BeginMessageContext();
 
 		///////////////////////////////////////////////
 
@@ -63,6 +62,65 @@ namespace NeoAxis.Networking
 
 		///////////////////////////////////////////////
 
+		public class BeginMessageContext
+		{
+			public ClientService Owner;
+			public int MessageID;
+			public ArrayDataWriter Writer = new ArrayDataWriter( 128 );
+			public string MessageForProfiler;
+
+			/////////////////////
+
+			[MethodImpl( (MethodImplOptions)512 )]
+			public void End()
+			{
+				var clientNode = Owner.Owner;
+				if( clientNode != null && clientNode.Status == NetworkStatus.Connected )
+				{
+					var writer = Writer;
+
+					int bytesWritten = clientNode.AddAccumulatedMessageToSend( writer );
+
+					var profilerDataCached = clientNode.ProfilerData;
+					if( profilerDataCached != null )
+					{
+						var serviceItem = profilerDataCached.GetServiceItem( Owner.Identifier );
+						var messageTypeItem = serviceItem.GetMessageTypeItem( MessageID );
+
+						Interlocked.Increment( ref messageTypeItem.SentMessages );
+						Interlocked.Add( ref messageTypeItem.SentSize, writer.Length );
+
+						Interlocked.Increment( ref profilerDataCached.TotalSentMessages );
+						Interlocked.Add( ref profilerDataCached.TotalSentSize, bytesWritten + writer.Length );
+
+						//custom message
+						if( !string.IsNullOrEmpty( MessageForProfiler ) )
+						{
+							//!!!!threading
+
+							try
+							{
+								if( messageTypeItem.SentCustomData == null )
+									messageTypeItem.SentCustomData = new Dictionary<string, ClientNode.ProfilerDataClass.ServiceItem.MessageTypeItem.CustomData>();
+
+								messageTypeItem.SentCustomData.TryGetValue( MessageForProfiler, out var item );
+								item.Messages++;
+								item.Size += writer.Length;// SendingDataWriterLength;
+								messageTypeItem.SentCustomData[ MessageForProfiler ] = item;
+							}
+							catch { }
+						}
+					}
+				}
+
+				var current = Owner.oneBeginMessage;
+				if( current == null || Writer.Data.Length > current.Writer.Data.Length )
+					Interlocked.CompareExchange( ref Owner.oneBeginMessage, this, current );
+			}
+		}
+
+		///////////////////////////////////////////////
+
 		protected ClientService( string name, int identifier )
 		{
 			this.name = name;
@@ -82,16 +140,6 @@ namespace NeoAxis.Networking
 		public int Identifier
 		{
 			get { return identifier; }
-		}
-
-		public bool SendingData
-		{
-			get { return sendingData; }
-		}
-
-		public int SendingDataWriterLength
-		{
-			get { return sendingDataWriter.Length; }
 		}
 
 		protected virtual void OnDispose()
@@ -189,65 +237,45 @@ namespace NeoAxis.Networking
 		protected internal virtual void OnUpdate() { }
 
 		[MethodImpl( (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( int messageID )
+		protected BeginMessageContext BeginMessage( int messageID )
 		{
-			if( sendingData )
-				Log.Fatal( "ClientService: BeginMessage: The message is already begun." );
-			if( messageID <= 0 || messageID > 15 )
-				Log.Fatal( "ClientService: BeginMessage: messageID <= 0 || messageID > 15." );
+			if( messageID <= 0 || messageID > maxMessageTypeIdentifier )
+				Log.Fatal( "ClientService: BeginMessage: messageID <= 0 || messageID > 255." );
 
-			sendingData = true;
-			sendingMessageID = messageID;
-			sendingDataWriter.Reset();
+			var m = Interlocked.Exchange( ref oneBeginMessage, null );
+			if( m == null )
+				m = new BeginMessageContext();
 
-			sendingDataWriter.Write( (byte)( ( Identifier << 4 ) + messageID ) );
+			m.Owner = this;
+			m.MessageID = messageID;
+			m.Writer.Reset();
+			m.MessageForProfiler = null;
+			m.Writer.Write( (byte)Identifier );
+			m.Writer.Write( (byte)messageID );
 
-			return sendingDataWriter;
+			return m;
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-		protected ArrayDataWriter BeginMessage( MessageType messageType )
+		protected BeginMessageContext BeginMessage( MessageType messageType )
 		{
 			return BeginMessage( messageType.Identifier );
 		}
 
-		[MethodImpl( (MethodImplOptions)512 )]
-		protected void EndMessage()
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void SendMessage( MessageType messageType, ArraySegment<byte> data )
 		{
-			if( !sendingData )
-				Log.Fatal( "ClientService: EndMessage: The message is not begun." );
-
-			if( owner.Status == NetworkStatus.Connected )
-			{
-				var writer = sendingDataWriter;
-
-				var bytesWritten = owner.accumulatedMessagesToSend.WriteVariableUInt32( (uint)writer.Length );
-				owner.accumulatedMessagesToSend.Write( writer.Data, 0, writer.Length );
-
-				var profilerDataCached = owner.ProfilerData;
-				if( profilerDataCached != null )
-				{
-					var serviceItem = profilerDataCached.GetServiceItem( Identifier );
-					var messageTypeItem = serviceItem.GetMessageTypeItem( sendingMessageID );
-					messageTypeItem.SentMessages++;
-					messageTypeItem.SentSize += sendingDataWriter.Length;
-
-					profilerDataCached.TotalSentMessages++;
-					profilerDataCached.TotalSentSize += bytesWritten + writer.Length;
-				}
-			}
-
-			sendingData = false;
-			sendingMessageID = -1;
-			sendingDataWriter.Reset();
+			var m = BeginMessage( messageType );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
 
-		//!!!!
-		////how to parse. need collect the data array with BeginMessage separately from usual BeginMessage
-		//public void SendMessageWithThreadingSupport( byte[] data )
-		//{
-		//	if( owner.Status == NetworkStatus.Connected )
-		//		owner.toProcessMessages.Enqueue( new ClientNode.ToProcessMessage { DataBinary = true, DataBinaryArray = data } );
-		//}
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public void SendMessage( int messageID, ArraySegment<byte> data )
+		{
+			var m = BeginMessage( messageID );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
+		}
 	}
 }

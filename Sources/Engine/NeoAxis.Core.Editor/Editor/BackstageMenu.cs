@@ -171,8 +171,9 @@ namespace NeoAxis.Editor
 				EditorLocalization2.TranslateForm( "Backstage", kryptonPageLogin );
 			}
 
-			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-				kryptonPageNew.Visible = false;
+			//!!!!new commented
+			//if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+			//	kryptonPageNew.Visible = false;
 
 			LoginLoad();
 			if( DefaultPage == kryptonPageBuild )
@@ -280,10 +281,11 @@ namespace NeoAxis.Editor
 
 		void InfoUpdate()
 		{
-			if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
-				kryptonTextBoxInfoName.Text = ProjectSettings.Get != null ? ProjectSettings.Get.General.CloudProjectName.Trim() : "";
-			else
-				kryptonTextBoxInfoName.Text = ProjectSettings.Get != null ? ProjectSettings.Get.General.ProjectName.Value.Trim() : "";
+			//!!!!new commented
+			//if( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.CloudClient )
+			//	kryptonTextBoxInfoName.Text = ProjectSettings.Get != null ? ProjectSettings.Get.General.CloudProjectName.Trim() : "";
+			//else
+			kryptonTextBoxInfoName.Text = ProjectSettings.Get != null ? ProjectSettings.Get.General.ProjectName.Value.Trim() : "";
 
 			kryptonTextBoxInfoLocation.Text = VirtualFileSystem.Directories.Project;
 		}

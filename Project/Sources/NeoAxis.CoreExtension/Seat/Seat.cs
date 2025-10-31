@@ -476,12 +476,12 @@ namespace NeoAxis
 						{
 							if( NetworkIsClient )
 							{
-								var writer = BeginNetworkMessageToServer( "PutObjectToSeat" );
-								if( writer != null )
+								var m = BeginNetworkMessageToServer( "PutObjectToSeat" );
+								if( m != null )
 								{
-									writer.WriteVariableInt32( seatIndex );
-									writer.WriteVariableUInt64( (ulong)character.NetworkID );
-									EndNetworkMessage();
+									m.Writer.WriteVariableInt32( seatIndex );
+									m.Writer.WriteVariableUInt64( (ulong)character.NetworkID );
+									m.End();
 								}
 							}
 							else

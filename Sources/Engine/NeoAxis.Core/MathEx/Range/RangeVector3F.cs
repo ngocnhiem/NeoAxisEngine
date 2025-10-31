@@ -30,8 +30,15 @@ namespace NeoAxis
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public RangeVector3F( Vector3F minimum, Vector3F maximum )
 		{
-			this.Minimum = minimum;
-			this.Maximum = maximum;
+			Minimum = minimum;
+			Maximum = maximum;
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public RangeVector3F( float minimumX, float minimumY, float minimumZ, float maximumX, float maximumY, float maximumZ )
+		{
+			Minimum = new Vector3F( minimumX, minimumY, minimumZ );
+			Maximum = new Vector3F( maximumX, maximumY, maximumZ );
 		}
 
 		[AutoConvertType]
@@ -228,7 +235,7 @@ namespace NeoAxis
 			{
 				if( index < 0 || index > 1 )
 					throw new ArgumentOutOfRangeException( "index" );
-				fixed ( Vector3F* v = &this.Minimum )
+				fixed( Vector3F* v = &this.Minimum )
 				{
 					return v[ index ];
 				}
@@ -238,7 +245,7 @@ namespace NeoAxis
 			{
 				if( index < 0 || index > 1 )
 					throw new ArgumentOutOfRangeException( "index" );
-				fixed ( Vector3F* v = &this.Minimum )
+				fixed( Vector3F* v = &this.Minimum )
 				{
 					v[ index ] = value;
 				}

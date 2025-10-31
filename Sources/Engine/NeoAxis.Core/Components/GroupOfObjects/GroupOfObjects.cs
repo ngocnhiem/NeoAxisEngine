@@ -3349,8 +3349,8 @@ namespace NeoAxis
 
 				//!!!!частичное обновление
 
-				var writer = client != null ? BeginNetworkMessage( client, "Objects" ) : BeginNetworkMessageToEveryone( "Objects" );
-				if( writer != null )
+				var m = client != null ? BeginNetworkMessage( client, "Objects" ) : BeginNetworkMessageToEveryone( "Objects" );
+				if( m != null )
 				{
 					var count = 0;
 					int capacity = ObjectsGetCapacity();
@@ -3362,7 +3362,7 @@ namespace NeoAxis
 						count++;
 					}
 
-					writer.Write( count );
+					m.Writer.Write( count );
 
 					if( count > 0 )
 					{
@@ -3379,13 +3379,13 @@ namespace NeoAxis
 									//ref var obj = ref Objects[ index ];
 
 									//!!!!check
-									writer.Write( pObjects + index, sizeof( Object ) );
+									m.Writer.Write( pObjects + index, sizeof( Object ) );
 								}
 							}
 						}
 					}
 
-					EndNetworkMessage();
+					m.End();
 				}
 			}
 		}

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Reflection;
+using Internal.LiteDB;
 
 namespace NeoAxis
 {
@@ -12,12 +13,13 @@ namespace NeoAxis
 	public static class SimpleTypes
 	{
 		static Dictionary<Type, TypeItem> types = new Dictionary<Type, TypeItem>();
-
 		static Dictionary<Type, Func<object, object>> convertDoubleToFloatTypes = new Dictionary<Type, Func<object, object>>();
 
 		//
 
 		public delegate object ParseTypeDelegate( string value );
+		public delegate object ReadTypeDelegate( ArrayDataReader reader );
+		public delegate void WriteTypeDelegate( ArrayDataWriter writer, object value );
 
 		//
 
@@ -26,9 +28,11 @@ namespace NeoAxis
 		/// </summary>
 		public class TypeItem
 		{
-			internal Type type;
-			internal ParseTypeDelegate parseFunction;
-			internal object defaultValue;
+			Type type;
+			ParseTypeDelegate parseFunction;
+			object defaultValue;
+			ReadTypeDelegate readFunction;
+			WriteTypeDelegate writeFunction;
 
 			//
 
@@ -47,11 +51,23 @@ namespace NeoAxis
 				get { return defaultValue; }
 			}
 
-			internal TypeItem( Type type, ParseTypeDelegate parseFunction, object defaultValue )
+			public ReadTypeDelegate ReadFunction
+			{
+				get { return readFunction; }
+			}
+
+			public WriteTypeDelegate WriteFunction
+			{
+				get { return writeFunction; }
+			}
+
+			internal TypeItem( Type type, ParseTypeDelegate parseFunction, object defaultValue, ReadTypeDelegate readFunction, WriteTypeDelegate writeFunction )
 			{
 				this.type = type;
 				this.parseFunction = parseFunction;
 				this.defaultValue = defaultValue;
+				this.readFunction = readFunction;
+				this.writeFunction = writeFunction;
 			}
 		}
 
@@ -68,7 +84,15 @@ namespace NeoAxis
 					//throw new Exception( "GetSimpleTypeValue: string type, value = null" );
 				}
 				return value;
-			}, "" );
+			}, "",
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadString();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (string)value );
+			} );
 
 			//bool
 			RegisterType( typeof( bool ), delegate ( string value )
@@ -80,175 +104,666 @@ namespace NeoAxis
 					return false;
 				else
 					return bool.Parse( value );
-			}, false );
+			}, false,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadBoolean();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (bool)value );
+			} );
 
 			//sbyte
-			RegisterType( typeof( sbyte ), delegate ( string value ) { return sbyte.Parse( value ); }, 0 );
+			RegisterType( typeof( sbyte ), delegate ( string value ) { return sbyte.Parse( value ); }, 0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadSByte();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (sbyte)value );
+			} );
 
 			//byte
-			RegisterType( typeof( byte ), delegate ( string value ) { return byte.Parse( value ); }, 0 );
+			RegisterType( typeof( byte ), delegate ( string value ) { return byte.Parse( value ); }, 0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadByte();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (byte)value );
+			} );
 
 			//char
-			RegisterType( typeof( char ), delegate ( string value ) { return char.Parse( value ); }, 0 );
+			RegisterType( typeof( char ), delegate ( string value ) { return char.Parse( value ); }, 0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadChar();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (char)value );
+			} );
 
 			//short
-			RegisterType( typeof( short ), delegate ( string value ) { return short.Parse( value ); }, 0 );
+			RegisterType( typeof( short ), delegate ( string value ) { return short.Parse( value ); }, 0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadShort();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (short)value );
+			} );
 
 			//ushort
-			RegisterType( typeof( ushort ), delegate ( string value ) { return ushort.Parse( value ); }, 0 );
+			RegisterType( typeof( ushort ), delegate ( string value ) { return ushort.Parse( value ); }, 0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadUShort();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (ushort)value );
+			} );
 
 			//int
-			RegisterType( typeof( int ), delegate ( string value ) { return int.Parse( value ); }, 0 );
+			RegisterType( typeof( int ), delegate ( string value ) { return int.Parse( value ); }, 0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadInt();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (int)value );
+			} );
 
 			//uint
-			RegisterType( typeof( uint ), delegate ( string value ) { return uint.Parse( value ); }, (uint)0 );
+			RegisterType( typeof( uint ), delegate ( string value ) { return uint.Parse( value ); }, (uint)0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadUInt();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (uint)value );
+			} );
 
 			//long
-			RegisterType( typeof( long ), delegate ( string value ) { return long.Parse( value ); }, (long)0 );
+			RegisterType( typeof( long ), delegate ( string value ) { return long.Parse( value ); }, (long)0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadLong();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (long)value );
+			} );
 
 			//ulong
-			RegisterType( typeof( ulong ), delegate ( string value ) { return ulong.Parse( value ); }, (ulong)0 );
+			RegisterType( typeof( ulong ), delegate ( string value ) { return ulong.Parse( value ); }, (ulong)0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadULong();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (ulong)value );
+			} );
 
 			//float
-			RegisterType( typeof( float ), delegate ( string value ) { return float.Parse( value ); }, 0.0f );
+			RegisterType( typeof( float ), delegate ( string value ) { return float.Parse( value ); }, 0.0f,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadFloat();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (float)value );
+			} );
 
 			//double
-			RegisterType( typeof( double ), delegate ( string value ) { return double.Parse( value ); }, 0.0 );
+			RegisterType( typeof( double ), delegate ( string value ) { return double.Parse( value ); }, 0.0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadDouble();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (double)value );
+			} );
 
 			//decimal
-			RegisterType( typeof( decimal ), delegate ( string value ) { return decimal.Parse( value ); }, (decimal)0.0 );
+			RegisterType( typeof( decimal ), delegate ( string value ) { return decimal.Parse( value ); }, (decimal)0.0,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadDecimal();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (decimal)value );
+			} );
 
-			//Vec2
-			RegisterType( typeof( Vector2F ), delegate ( string value ) { return Vector2F.Parse( value ); }, Vector2F.Zero );
+			//Vector2F
+			RegisterType( typeof( Vector2F ), delegate ( string value ) { return Vector2F.Parse( value ); }, Vector2F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector2F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector2F)value );
+			} );
 
-			//Range
-			RegisterType( typeof( RangeF ), delegate ( string value ) { return RangeF.Parse( value ); }, RangeF.Zero );
+			//RangeF
+			RegisterType( typeof( RangeF ), delegate ( string value ) { return RangeF.Parse( value ); }, RangeF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRangeF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RangeF)value );
+			} );
 
-			//Vec3
-			RegisterType( typeof( Vector3F ), delegate ( string value ) { return Vector3F.Parse( value ); }, Vector3F.Zero );
+			//Vector3F
+			RegisterType( typeof( Vector3F ), delegate ( string value ) { return Vector3F.Parse( value ); }, Vector3F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector3F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector3F)value );
+			} );
 
-			//Vec4
-			RegisterType( typeof( Vector4F ), delegate ( string value ) { return Vector4F.Parse( value ); }, Vector4F.Zero );
+			//Vector4F
+			RegisterType( typeof( Vector4F ), delegate ( string value ) { return Vector4F.Parse( value ); }, Vector4F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector4F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector4F)value );
+			} );
 
-			//Bounds
-			RegisterType( typeof( BoundsF ), delegate ( string value ) { return BoundsF.Parse( value ); }, BoundsF.Zero );
+			//BoundsF
+			RegisterType( typeof( BoundsF ), delegate ( string value ) { return BoundsF.Parse( value ); }, BoundsF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadBoundsF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (BoundsF)value );
+			} );
 
-			//Quat
-			RegisterType( typeof( QuaternionF ), delegate ( string value ) { return QuaternionF.Parse( value ); }, QuaternionF.Identity );
+			//QuaternionF
+			RegisterType( typeof( QuaternionF ), delegate ( string value ) { return QuaternionF.Parse( value ); }, QuaternionF.Identity,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadQuaternionF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (QuaternionF)value );
+			} );
 
 			//ColorValue
-			RegisterType( typeof( ColorValue ), delegate ( string value ) { return ColorValue.Parse( value ); }, ColorValue.Zero );
+			RegisterType( typeof( ColorValue ), delegate ( string value ) { return ColorValue.Parse( value ); }, ColorValue.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadColorValue();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (ColorValue)value );
+			} );
 
 			//ColorValuePowered
-			RegisterType( typeof( ColorValuePowered ), delegate ( string value ) { return ColorValuePowered.Parse( value ); }, ColorValuePowered.Zero );
+			RegisterType( typeof( ColorValuePowered ), delegate ( string value ) { return ColorValuePowered.Parse( value ); }, ColorValuePowered.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadColorValuePowered();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (ColorValuePowered)value );
+			} );
 
 			//ColorPacked
-			RegisterType( typeof( ColorByte ), delegate ( string value ) { return ColorByte.Parse( value ); }, ColorByte.Zero );
+			RegisterType( typeof( ColorByte ), delegate ( string value ) { return ColorByte.Parse( value ); }, ColorByte.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadColorByte();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (ColorByte)value );
+			} );
 
-			//SphereDir
-			RegisterType( typeof( SphericalDirectionF ), delegate ( string value ) { return SphericalDirectionF.Parse( value ); }, SphericalDirectionF.Zero );
+			//SphereDirectionF
+			RegisterType( typeof( SphericalDirectionF ), delegate ( string value ) { return SphericalDirectionF.Parse( value ); }, SphericalDirectionF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadSphericalDirectionF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (SphericalDirectionF)value );
+			} );
 
-			//Vec2I
-			RegisterType( typeof( Vector2I ), delegate ( string value ) { return Vector2I.Parse( value ); }, Vector2I.Zero );
+			//Vector2I
+			RegisterType( typeof( Vector2I ), delegate ( string value ) { return Vector2I.Parse( value ); }, Vector2I.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector2I();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector2I)value );
+			} );
 
-			//Vec3I
-			RegisterType( typeof( Vector3I ), delegate ( string value ) { return Vector3I.Parse( value ); }, Vector3I.Zero );
+			//Vector3I
+			RegisterType( typeof( Vector3I ), delegate ( string value ) { return Vector3I.Parse( value ); }, Vector3I.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector3I();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector3I)value );
+			} );
 
-			//Vec4I
-			RegisterType( typeof( Vector4I ), delegate ( string value ) { return Vector4I.Parse( value ); }, Vector4I.Zero );
+			//Vector4I
+			RegisterType( typeof( Vector4I ), delegate ( string value ) { return Vector4I.Parse( value ); }, Vector4I.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector4I();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector4I)value );
+			} );
 
-			//Rect
-			RegisterType( typeof( RectangleF ), delegate ( string value ) { return RectangleF.Parse( value ); }, RectangleF.Zero );
+			//RectangleF
+			RegisterType( typeof( RectangleF ), delegate ( string value ) { return RectangleF.Parse( value ); }, RectangleF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRectangleF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RectangleF)value );
+			} );
 
-			//RectI
-			RegisterType( typeof( RectangleI ), delegate ( string value ) { return RectangleI.Parse( value ); }, RectangleI.Zero );
+			//RectangleI
+			RegisterType( typeof( RectangleI ), delegate ( string value ) { return RectangleI.Parse( value ); }, RectangleI.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRectangleI();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RectangleI)value );
+			} );
 
-			//Degree
-			RegisterType( typeof( DegreeF ), delegate ( string value ) { return DegreeF.Parse( value ); }, DegreeF.Zero );
+			//DegreeF
+			RegisterType( typeof( DegreeF ), delegate ( string value ) { return DegreeF.Parse( value ); }, DegreeF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadDegreeF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (DegreeF)value );
+			} );
 
-			//Radian
-			RegisterType( typeof( RadianF ), delegate ( string value ) { return RadianF.Parse( value ); }, RadianF.Zero );
+			//RadianF
+			RegisterType( typeof( RadianF ), delegate ( string value ) { return RadianF.Parse( value ); }, RadianF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRadianF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RadianF)value );
+			} );
 
-			//Vec2D
-			RegisterType( typeof( Vector2 ), delegate ( string value ) { return Vector2.Parse( value ); }, Vector2.Zero );
+			//Vector2
+			RegisterType( typeof( Vector2 ), delegate ( string value ) { return Vector2.Parse( value ); }, Vector2.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector2();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector2)value );
+			} );
 
-			//RangeD
-			RegisterType( typeof( Range ), delegate ( string value ) { return Range.Parse( value ); }, Range.Zero );
+			//Range
+			RegisterType( typeof( Range ), delegate ( string value ) { return Range.Parse( value ); }, Range.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRange();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Range)value );
+			} );
 
 			//RangeI
-			RegisterType( typeof( RangeI ), delegate ( string value ) { return RangeI.Parse( value ); }, RangeI.Zero );
+			RegisterType( typeof( RangeI ), delegate ( string value ) { return RangeI.Parse( value ); }, RangeI.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRangeI();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RangeI)value );
+			} );
 
-			//Vec3D
-			RegisterType( typeof( Vector3 ), delegate ( string value ) { return Vector3.Parse( value ); }, Vector3.Zero );
+			//Vector3
+			RegisterType( typeof( Vector3 ), delegate ( string value ) { return Vector3.Parse( value ); }, Vector3.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector3();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector3)value );
+			} );
 
-			//Vec4D
-			RegisterType( typeof( Vector4 ), delegate ( string value ) { return Vector4.Parse( value ); }, Vector4.Zero );
+			//Vector4
+			RegisterType( typeof( Vector4 ), delegate ( string value ) { return Vector4.Parse( value ); }, Vector4.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadVector4();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Vector4)value );
+			} );
 
-			//BoundsD
-			RegisterType( typeof( Bounds ), delegate ( string value ) { return Bounds.Parse( value ); }, Bounds.Zero );
+			//Bounds
+			RegisterType( typeof( Bounds ), delegate ( string value ) { return Bounds.Parse( value ); }, Bounds.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadBounds();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Bounds)value );
+			} );
 
-			//QuatD
-			RegisterType( typeof( Quaternion ), delegate ( string value ) { return Quaternion.Parse( value ); }, Quaternion.Identity );
+			//Quaternion
+			RegisterType( typeof( Quaternion ), delegate ( string value ) { return Quaternion.Parse( value ); }, Quaternion.Identity,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadQuaternion();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Quaternion)value );
+			} );
 
-			//SphereDirD
-			RegisterType( typeof( SphericalDirection ), delegate ( string value ) { return SphericalDirection.Parse( value ); }, SphericalDirection.Zero );
+			//SphericalDirection
+			RegisterType( typeof( SphericalDirection ), delegate ( string value ) { return SphericalDirection.Parse( value ); }, SphericalDirection.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadSphericalDirection();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (SphericalDirection)value );
+			} );
 
-			//RectD
-			RegisterType( typeof( Rectangle ), delegate ( string value ) { return Rectangle.Parse( value ); }, Rectangle.Zero );
+			//Rectangle
+			RegisterType( typeof( Rectangle ), delegate ( string value ) { return Rectangle.Parse( value ); }, Rectangle.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRectangle();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Rectangle)value );
+			} );
 
-			//DegreeD
-			RegisterType( typeof( Degree ), delegate ( string value ) { return Degree.Parse( value ); }, Degree.Zero );
+			//Degree
+			RegisterType( typeof( Degree ), delegate ( string value ) { return Degree.Parse( value ); }, Degree.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadDegree();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Degree)value );
+			} );
 
-			//RadianD
-			RegisterType( typeof( Radian ), delegate ( string value ) { return Radian.Parse( value ); }, Radian.Zero );
+			//Radian
+			RegisterType( typeof( Radian ), delegate ( string value ) { return Radian.Parse( value ); }, Radian.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRadian();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Radian)value );
+			} );
+
+			//AnglesF
+			RegisterType( typeof( AnglesF ), delegate ( string value ) { return AnglesF.Parse( value ); }, AnglesF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadAnglesF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (AnglesF)value );
+			} );
 
 			//Angles
-			RegisterType( typeof( AnglesF ), delegate ( string value ) { return AnglesF.Parse( value ); }, AnglesF.Zero );
+			RegisterType( typeof( Angles ), delegate ( string value ) { return Angles.Parse( value ); }, Angles.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadAngles();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Angles)value );
+			} );
 
-			//AnglesD
-			RegisterType( typeof( Angles ), delegate ( string value ) { return Angles.Parse( value ); }, Angles.Zero );
+			//Matrix2F
+			RegisterType( typeof( Matrix2F ), delegate ( string value ) { return Matrix2F.Parse( value ); }, Matrix2F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadMatrix2F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Matrix2F)value );
+			} );
 
-			//Mat2F
-			RegisterType( typeof( Matrix2F ), delegate ( string value ) { return Matrix2F.Parse( value ); }, Matrix2F.Zero );
+			//Matrix2
+			RegisterType( typeof( Matrix2 ), delegate ( string value ) { return Matrix2.Parse( value ); }, Matrix2.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadMatrix2();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Matrix2)value );
+			} );
 
-			//Mat2D
-			RegisterType( typeof( Matrix2 ), delegate ( string value ) { return Matrix2.Parse( value ); }, Matrix2.Zero );
+			//Matrix3F
+			RegisterType( typeof( Matrix3F ), delegate ( string value ) { return Matrix3F.Parse( value ); }, Matrix3F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadMatrix3F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Matrix3F)value );
+			} );
 
-			//Mat3F
-			RegisterType( typeof( Matrix3F ), delegate ( string value ) { return Matrix3F.Parse( value ); }, Matrix3F.Zero );
+			//Matrix3
+			RegisterType( typeof( Matrix3 ), delegate ( string value ) { return Matrix3.Parse( value ); }, Matrix3.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadMatrix3();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Matrix3)value );
+			} );
 
-			//Mat3D
-			RegisterType( typeof( Matrix3 ), delegate ( string value ) { return Matrix3.Parse( value ); }, Matrix3.Zero );
+			//Matrix4F
+			RegisterType( typeof( Matrix4F ), delegate ( string value ) { return Matrix4F.Parse( value ); }, Matrix4F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadMatrix4F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Matrix4F)value );
+			} );
 
-			//Mat4F
-			RegisterType( typeof( Matrix4F ), delegate ( string value ) { return Matrix4F.Parse( value ); }, Matrix4F.Zero );
-
-			//Mat4D
-			RegisterType( typeof( Matrix4 ), delegate ( string value ) { return Matrix4.Parse( value ); }, Matrix4.Zero );
+			//Matrix4
+			RegisterType( typeof( Matrix4 ), delegate ( string value ) { return Matrix4.Parse( value ); }, Matrix4.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadMatrix4();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Matrix4)value );
+			} );
 
 			//PlaneF
-			RegisterType( typeof( PlaneF ), delegate ( string value ) { return PlaneF.Parse( value ); }, PlaneF.Zero );
+			RegisterType( typeof( PlaneF ), delegate ( string value ) { return PlaneF.Parse( value ); }, PlaneF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadPlaneF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (PlaneF)value );
+			} );
 
-			//PlaneD
-			RegisterType( typeof( Plane ), delegate ( string value ) { return Plane.Parse( value ); }, Plane.Zero );
+			//Plane
+			RegisterType( typeof( Plane ), delegate ( string value ) { return Plane.Parse( value ); }, Plane.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadPlane();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Plane)value );
+			} );
 
 			//Transform
-			RegisterType( typeof( Transform ), delegate ( string value ) { return Transform.Parse( value ); }, Transform.Identity );
+			RegisterType( typeof( Transform ), delegate ( string value ) { return Transform.Parse( value ); }, Transform.Identity,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadTransform();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Transform)value );
+			} );
 
-			RegisterType( typeof( SphereF ), delegate ( string value ) { return SphereF.Parse( value ); }, SphereF.Zero );
-			RegisterType( typeof( Sphere ), delegate ( string value ) { return Sphere.Parse( value ); }, Sphere.Zero );
+			//SphereF
+			RegisterType( typeof( SphereF ), delegate ( string value ) { return SphereF.Parse( value ); }, SphereF.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadSphereF();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (SphereF)value );
+			} );
+
+			//Sphere
+			RegisterType( typeof( Sphere ), delegate ( string value ) { return Sphere.Parse( value ); }, Sphere.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadSphere();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (Sphere)value );
+			} );
 
 			//UIMeasureValueDouble
-			RegisterType( typeof( UIMeasureValueDouble ), delegate ( string value ) { return UIMeasureValueDouble.Parse( value ); }, new UIMeasureValueDouble() );
+			RegisterType( typeof( UIMeasureValueDouble ), delegate ( string value ) { return UIMeasureValueDouble.Parse( value ); }, new UIMeasureValueDouble(),
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadUIMeasureValueDouble();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (UIMeasureValueDouble)value );
+			} );
 
-			//UIMeasureValueVec2
-			RegisterType( typeof( UIMeasureValueVector2 ), delegate ( string value ) { return UIMeasureValueVector2.Parse( value ); }, new UIMeasureValueVector2() );
+			//UIMeasureValueVector2
+			RegisterType( typeof( UIMeasureValueVector2 ), delegate ( string value ) { return UIMeasureValueVector2.Parse( value ); }, new UIMeasureValueVector2(),
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadUIMeasureValueVector2();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (UIMeasureValueVector2)value );
+			} );
 
-			//UIMeasureValueRect
-			RegisterType( typeof( UIMeasureValueRectangle ), delegate ( string value ) { return UIMeasureValueRectangle.Parse( value ); }, new UIMeasureValueRectangle() );
+			//UIMeasureValueRectangle
+			RegisterType( typeof( UIMeasureValueRectangle ), delegate ( string value ) { return UIMeasureValueRectangle.Parse( value ); }, new UIMeasureValueRectangle(),
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadUIMeasureValueRectangle();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (UIMeasureValueRectangle)value );
+			} );
 
-			RegisterType( typeof( RangeVector3F ), delegate ( string value ) { return RangeVector3F.Parse( value ); }, RangeVector3F.Zero );
-			RegisterType( typeof( RangeColorValue ), delegate ( string value ) { return RangeColorValue.Parse( value ); }, RangeColorValue.Zero );
+			//RangeVector3F
+			RegisterType( typeof( RangeVector3F ), delegate ( string value ) { return RangeVector3F.Parse( value ); }, RangeVector3F.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRangeVector3F();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RangeVector3F)value );
+			} );
+
+			//RangeColorValue
+			RegisterType( typeof( RangeColorValue ), delegate ( string value ) { return RangeColorValue.Parse( value ); }, RangeColorValue.Zero,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadRangeColorValue();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (RangeColorValue)value );
+			} );
+
+			//!!!!DateTime?
+
+			//ObjectId
+			RegisterType( typeof( ObjectId ), delegate ( string value ) { return new ObjectId( value ); }, ObjectId.Empty,
+			delegate ( ArrayDataReader reader )
+			{
+				return reader.ReadObjectId();
+			},
+			delegate ( ArrayDataWriter writer, object value )
+			{
+				writer.Write( (ObjectId)value );
+			} );
 
 			//no Parse methods. This is complex structures. This is not simple types? or just can't parse?
 			//Box
@@ -279,8 +794,7 @@ namespace NeoAxis
 
 		public static TypeItem GetTypeItem( Type type )
 		{
-			TypeItem item;
-			types.TryGetValue( type, out item );
+			types.TryGetValue( type, out var item );
 			return item;
 		}
 
@@ -321,6 +835,7 @@ namespace NeoAxis
 		{
 			if( typeof( Enum ).IsAssignableFrom( type ) )
 			{
+				//remove fatals?
 				Log.Fatal( "SimpleTypesUtils: GetDefaultValue: Enum types are not supported." );
 				return null;
 			}
@@ -331,11 +846,12 @@ namespace NeoAxis
 			return item.DefaultValue;
 		}
 
-		public static void RegisterType( Type type, ParseTypeDelegate parseFunction, object defaultValue )
+		public static void RegisterType( Type type, ParseTypeDelegate parseFunction, object defaultValue, ReadTypeDelegate readFunction, WriteTypeDelegate writeFunction )
 		{
-			//this is multithreading support
-			Dictionary<Type, TypeItem> newTypes = new Dictionary<Type, TypeItem>( types );
-			newTypes.Add( type, new TypeItem( type, parseFunction, defaultValue ) );
+			//this copying for multithreading support
+			var newTypes = new Dictionary<Type, TypeItem>( types );
+			newTypes.Add( type, new TypeItem( type, parseFunction, defaultValue, readFunction, writeFunction ) );
+
 			//update
 			types = newTypes;
 
@@ -373,5 +889,29 @@ namespace NeoAxis
 				return func( value );
 			return value;
 		}
+
+		public static void Write( TypeItem type, ArrayDataWriter writer, object value )
+		{
+			type.WriteFunction( writer, value );
+		}
+
+		public static object Read( TypeItem type, ArrayDataReader reader, Type typeToRead )
+		{
+			return type.ReadFunction( reader );
+		}
+
+		public static TypeItem GetTypeItem( string typeName )
+		{
+			//!!!!slowly
+
+			foreach( var typeItem in types.Values )
+			{
+				if( typeItem.Type.FullName == typeName )
+					return typeItem;
+			}
+
+			return null;
+		}
+
 	}
 }

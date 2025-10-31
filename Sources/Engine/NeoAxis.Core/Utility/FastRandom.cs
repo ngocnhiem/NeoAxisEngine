@@ -158,6 +158,42 @@ namespace NeoAxis
 			return minValue + (int)( ( DOUBLE_UNIT_INT * (double)(int)( 0x7FFFFFFF & ( w = ( w ^ ( w >> 19 ) ) ^ ( t ^ ( t >> 8 ) ) ) ) ) * (double)range );
 		}
 
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public long NextLong()
+		{
+			var high = (uint)NextInteger();
+			var low = (uint)NextInteger();
+			return ( ( (long)high ) << 32 ) | low;
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public long Next( long maxValue )
+		{
+			ulong unsignedValue = (ulong)NextLong();
+			return (long)( ( (double)unsignedValue / (double)ulong.MaxValue ) * maxValue );
+
+			//var high = (uint)NextInteger();
+			//var low = (uint)NextInteger();
+			//var value = ( ( (long)high ) << 32 ) | low;
+			//if( value < 0 )
+			//	value = -value;
+			//return (long)( ( (double)value / (double)long.MaxValue ) * maxValue );
+		}
+
+		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
+		public long Next( long minValue, long maxValue )
+		{
+			ulong unsignedValue = (ulong)NextLong();
+			return minValue + (long)( ( (double)unsignedValue / (double)ulong.MaxValue ) * ( maxValue - minValue ) );
+
+			//var high = (uint)NextInteger();
+			//var low = (uint)NextInteger();
+			//var value = ( ( (long)high ) << 32 ) | low;
+			//if( value < 0 )
+			//	value = -value;
+			//return minValue + (long)( ( (double)value / (double)long.MaxValue ) * ( maxValue - minValue ) );
+		}
+
 		/// <summary>
 		/// Returns a random number between 0.0 and 1.0.
 		/// </summary>

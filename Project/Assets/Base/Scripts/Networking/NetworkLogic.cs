@@ -227,7 +227,7 @@ namespace NeoAxis
 
 				foreach( var item in serverUsers.Values )
 				{
-					if( SimulationAppServer.Server.Users.GetUser( item.User.UserID ) == null )
+					if( SimulationAppServer.ServerNode.Users.GetUser( item.User.UserID ) == null )
 						toRemove.Add( item );
 				}
 
@@ -236,7 +236,7 @@ namespace NeoAxis
 			}
 
 			//add new users
-			foreach( var user in SimulationAppServer.Server.Users.Users )
+			foreach( var user in SimulationAppServer.ServerNode.Users.Users )
 			{
 				if( !serverUsers.ContainsKey( user ) )
 					AddUser( user );
@@ -551,16 +551,16 @@ namespace NeoAxis
 			var referenceToObject = item.ObjectControlledByPlayer != null ? "root:" + item.ObjectControlledByPlayer.GetPathFromRoot() : "";
 
 			//send update to the user
-			var writer = BeginNetworkMessage( item.User, "SetObjectControlledByPlayer" );
-			if( writer != null )
+			var m = BeginNetworkMessage( item.User, "SetObjectControlledByPlayer" );
+			if( m != null )
 			{
-				writer.Write( referenceToObject );
-				EndNetworkMessage();
+				m.Writer.Write( referenceToObject );
+				m.End();
 			}
 
 #if !CLIENT
 			//send update to all users. can be optional
-			SimulationAppServer.Server?.Users.UpdateObjectControlledByPlayerToClient( item.User, referenceToObject );
+			SimulationAppServer.ServerNode?.Users.UpdateObjectControlledByPlayerToClient( item.User, referenceToObject );
 #endif
 		}
 
@@ -599,12 +599,12 @@ namespace NeoAxis
 
 		public void SendScreenMessageToClient( ServerNetworkService_Components.ClientItem client, string text, bool error )
 		{
-			var writer = BeginNetworkMessage( client, "ScreenMessage" );
-			if( writer != null )
+			var m = BeginNetworkMessage( client, "ScreenMessage" );
+			if( m != null )
 			{
-				writer.Write( text );
-				writer.Write( error );
-				EndNetworkMessage();
+				m.Writer.Write( text );
+				m.Writer.Write( error );
+				m.End();
 			}
 		}
 
@@ -613,34 +613,34 @@ namespace NeoAxis
 			var user = ServerGetUserByObjectControlled( controlledObject );
 			if( user != null )
 			{
-				var writer = BeginNetworkMessage( user, "ScreenMessage" );
-				if( writer != null )
+				var m = BeginNetworkMessage( user, "ScreenMessage" );
+				if( m != null )
 				{
-					writer.Write( text );
-					writer.Write( error );
-					EndNetworkMessage();
+					m.Writer.Write( text );
+					m.Writer.Write( error );
+					m.End();
 				}
 			}
 		}
 
 		public void SendScreenMessageToAllClients( string text, bool error )
 		{
-			var writer = BeginNetworkMessageToEveryone( "ScreenMessage" );
-			if( writer != null )
+			var m = BeginNetworkMessageToEveryone( "ScreenMessage" );
+			if( m != null )
 			{
-				writer.Write( text );
-				writer.Write( error );
-				EndNetworkMessage();
+				m.Writer.Write( text );
+				m.Writer.Write( error );
+				m.End();
 			}
 		}
 
 		void SendSetEnteredToWorld( ServerUserItem userItem )
 		{
-			var writer = BeginNetworkMessage( userItem.User, "SetEnteredToWorld" );
-			if( writer != null )
+			var m = BeginNetworkMessage( userItem.User, "SetEnteredToWorld" );
+			if( m != null )
 			{
-				writer.Write( userItem.EnteredToWorld );
-				EndNetworkMessage();
+				m.Writer.Write( userItem.EnteredToWorld );
+				m.End();
 			}
 		}
 
@@ -680,7 +680,7 @@ namespace NeoAxis
 			return true;
 		}
 
-//#endif
+		//#endif
 
 
 		/////////////////////////////////////////
@@ -749,7 +749,7 @@ namespace NeoAxis
 			}
 			else if( message == "SetObjectControlledByPlayer" )
 			{
-				var referenceToObject = reader.ReadString();
+				var referenceToObject = reader.ReadString() ?? string.Empty;
 				if( !reader.Complete() )
 					return false;
 
@@ -775,7 +775,7 @@ namespace NeoAxis
 			}
 			else if( message == "ScreenMessage" )
 			{
-				var text = reader.ReadString();
+				var text = reader.ReadString() ?? string.Empty;
 				var error = reader.ReadBoolean();
 				if( !reader.Complete() )
 					return false;

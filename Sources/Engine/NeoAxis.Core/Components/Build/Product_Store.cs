@@ -1557,20 +1557,33 @@ again:;
 		//	return ( category & ( ProjectItemCategoriesEnum.Animals | ProjectItemCategoriesEnum.Architecture | ProjectItemCategoriesEnum.Characters | ProjectItemCategoriesEnum.Exterior | ProjectItemCategoriesEnum.Food | ProjectItemCategoriesEnum.Industrial | ProjectItemCategoriesEnum.Interior | ProjectItemCategoriesEnum.Vehicles | ProjectItemCategoriesEnum.Nature | ProjectItemCategoriesEnum.Weapons | ProjectItemCategoriesEnum.UncategorizedModels ) ) != 0;
 		//}
 
-		static string GetMD5( string input )
+		static string GetHash( string input )
 		{
 			// Use input string to calculate MD5 hash
-			using( System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create() )
+			using( var sha = System.Security.Cryptography.SHA256.Create() )
 			{
 				byte[] inputBytes = Encoding.ASCII.GetBytes( input );
-				byte[] hashBytes = md5.ComputeHash( inputBytes );
+				byte[] hashBytes = sha.ComputeHash( inputBytes );
 
 				// Convert the byte array to hexadecimal string
 				var sb = new StringBuilder();
 				for( int i = 0; i < hashBytes.Length; i++ )
 					sb.Append( hashBytes[ i ].ToString( "X2" ) );
-				return sb.ToString();
+				return sb.ToString().Substring( 0, 32 );
 			}
+
+			//// Use input string to calculate MD5 hash
+			//using( System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create() )
+			//{
+			//	byte[] inputBytes = Encoding.ASCII.GetBytes( input );
+			//	byte[] hashBytes = md5.ComputeHash( inputBytes );
+
+			//	// Convert the byte array to hexadecimal string
+			//	var sb = new StringBuilder();
+			//	for( int i = 0; i < hashBytes.Length; i++ )
+			//		sb.Append( hashBytes[ i ].ToString( "X2" ) );
+			//	return sb.ToString();
+			//}
 		}
 
 		public virtual string GetIdentifier()
@@ -1583,7 +1596,7 @@ again:;
 
 				var fileName = ComponentUtility.GetOwnedFileNameOfComponent( this );
 				if( !string.IsNullOrEmpty( fileName ) )
-					result += "_" + GetMD5( fileName + ":byfilename" ).ToLower().Substring( 0, 12 );
+					result += "_" + GetHash( fileName + ":byfilename" ).ToLower().Substring( 0, 12 );
 			}
 
 			return result;

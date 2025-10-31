@@ -584,8 +584,9 @@ namespace NeoAxis
 					ParentScene?.SoundPlay( type.OpenSound, TransformV.Position );
 					if( NetworkIsServer && type.OpenSound.ReferenceOrValueSpecified )
 					{
-						BeginNetworkMessageToEveryone( "OpenSound" );
-						EndNetworkMessage();
+						var m = BeginNetworkMessageToEveryone( "OpenSound" );
+						if( m != null )
+							m.End();
 					}
 				}
 			}
@@ -604,8 +605,9 @@ namespace NeoAxis
 					ParentScene?.SoundPlay( type.CloseSound, TransformV.Position );
 					if( NetworkIsServer && type.CloseSound.ReferenceOrValueSpecified )
 					{
-						BeginNetworkMessageToEveryone( "CloseSound" );
-						EndNetworkMessage();
+						var m = BeginNetworkMessageToEveryone( "CloseSound" );
+						if( m != null )
+							m.End();
 					}
 				}
 			}
@@ -642,11 +644,11 @@ namespace NeoAxis
 			//start switching
 			if( NetworkIsClient )
 			{
-				var writer = BeginNetworkMessageToServer( "Switch" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "Switch" );
+				if( m != null )
 				{
-					writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
-					EndNetworkMessage();
+					m.Writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
+					m.End();
 				}
 			}
 			else

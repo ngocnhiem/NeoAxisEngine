@@ -46,7 +46,7 @@ namespace Project
 					fullPaths.Add( file );
 
 					string itemText = showOnlyFileNames ? Path.GetFileName( file ) : file;
-					list.Items.Add( itemText );
+					list.AddItem( itemText );
 
 					if( PlayScreen.Instance != null && string.Compare( PlayScreen.Instance.PlayFileName, file, true ) == 0 )
 						list.SelectedIndex = list.Items.Count - 1;

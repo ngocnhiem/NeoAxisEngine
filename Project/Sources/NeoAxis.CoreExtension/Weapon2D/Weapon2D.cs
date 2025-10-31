@@ -219,8 +219,9 @@ namespace NeoAxis
 
 			if( NetworkIsServer )
 			{
-				BeginNetworkMessageToEveryone( "FiringBegin" );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "FiringBegin" );
+				if( m != null )
+					m.End();
 			}
 
 			FiringBeginEvent?.Invoke( this );
@@ -234,8 +235,9 @@ namespace NeoAxis
 			//if( Firing )
 			//	return;
 
-			BeginNetworkMessageToServer( "FiringBeginFromClient" );
-			EndNetworkMessage();
+			var m = BeginNetworkMessageToServer( "FiringBeginFromClient" );
+			if( m != null )
+				m.End();
 		}
 
 		public void FiringEnd()

@@ -1,4 +1,4 @@
-<b>NeoAxis Engine</b> is a versatile game engine designed for creating video games and real-time apps. It is well-suited for developing various 3D and 2D projects, including computer games, simulators, VR systems, and apps with rich graphics.
+<b>NeoAxis Engine</b> is a versatile game engine designed for creating video games and real-time apps. It is well-suited for developing various 3D and 2D projects, including computer games, simulators, virtual reality systems, and apps with rich graphics.
 
 <a href="https://www.neoaxis.com/">www.neoaxis.com</a>
 

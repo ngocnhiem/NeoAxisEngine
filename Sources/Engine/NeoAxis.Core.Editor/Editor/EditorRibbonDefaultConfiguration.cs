@@ -591,66 +591,6 @@ namespace NeoAxis.Editor
 
 			}
 
-			////Terrain
-			//if( EngineInfo.ExtendedEdition )
-			//{
-			//	bool VisibleCondition()
-			//	{
-			//		var rootComponent = EditorForm.Instance.WorkspaceController.SelectedDocumentWindow?.ObjectOfWindow as Scene;
-			//		return rootComponent != null && rootComponent.GetComponent<ITerrain>( true ) != null;
-			//	}
-
-			//	var tab = new Tab( "Terrain Editor", "TerrainEditor", null, VisibleCondition );
-			//	Tabs.Add( tab );
-
-			//	//Geometry
-			//	{
-			//		var group = new Group( "Geometry" );
-			//		tab.Groups.Add( group );
-			//		group.AddAction( "Terrain Geometry Raise" );
-			//		group.AddAction( "Terrain Geometry Lower" );
-			//		group.AddAction( "Terrain Geometry Smooth" );
-			//		group.AddAction( "Terrain Geometry Flatten" );
-			//	}
-
-			//	////Hole
-			//	//{
-			//	//	var group = new Group( "Hole" );
-			//	//	tab.Groups.Add( group );
-			//	//	group.AddAction( "Terrain Hole Add" );
-			//	//	group.AddAction( "Terrain Hole Delete" );
-			//	//}
-
-			//	//Shape
-			//	{
-			//		var group = new Group( "Shape" );
-			//		tab.Groups.Add( group );
-			//		group.AddAction( "Terrain Shape Circle" );
-			//		group.AddAction( "Terrain Shape Square" );
-			//	}
-
-			//	//Tool Settings
-			//	{
-			//		var group = new Group( "Tool Settings" );
-			//		tab.Groups.Add( group );
-			//		group.AddAction( "Terrain Tool Radius" );
-			//		group.AddAction( "Terrain Tool Strength" );
-			//		group.AddAction( "Terrain Tool Hardness" );
-			//	}
-
-			//	//Painting
-			//	{
-			//		var group = new Group( "Paint" );
-			//		tab.Groups.Add( group );
-			//		group.AddAction( "Terrain Paint Paint" );
-			//		group.AddAction( "Terrain Paint Clear" );
-			//		group.AddAction( "Terrain Paint Smooth" );
-			//		group.AddAction( "Terrain Paint Flatten" );
-			//		group.AddAction( "Terrain Paint Layers" );
-			//		group.AddAction( "Terrain Paint Add Layer" );
-			//	}
-			//}
-
 			//Mesh
 			{
 				var tab = new Tab( "Mesh Editor", "ComponentTypeSpecific", MetadataManager.GetTypeOfNetType( typeof( Mesh ) ) );

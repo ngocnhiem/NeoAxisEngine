@@ -1980,8 +1980,9 @@ namespace NeoAxis
 
 			if( NetworkIsServer && CollisionSound.ReferenceOrValueSpecified )
 			{
-				BeginNetworkMessageToEveryone( "CollisionSoundPlay" );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "CollisionSoundPlay" );
+				if( m != null )
+					m.End();
 			}
 		}
 

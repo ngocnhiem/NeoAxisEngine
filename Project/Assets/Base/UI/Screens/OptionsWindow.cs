@@ -161,15 +161,15 @@ namespace Project
 				{
 					for( int n = listAntialiasingBasic.Items.Count - 1; n >= 0; n-- )
 					{
-						if( listAntialiasingBasic.Items[ n ].Contains( "SSAA" ) )
-							listAntialiasingBasic.Items.RemoveAt( n );
+						if( ( (string)listAntialiasingBasic.Items[ n ].Value ).Contains( "SSAA" ) )
+							listAntialiasingBasic.RemoveItem( n );
 					}
 				}
 
 				listAntialiasingBasic.SelectItem( SimulationApp.AntialiasingBasic );
 				listAntialiasingBasic.SelectedIndexChanged += delegate ( UIList sender )
 				{
-					SimulationApp.AntialiasingBasic = sender.SelectedItem;
+					SimulationApp.AntialiasingBasic = (string)sender.SelectedItem.Value;
 				};
 			}
 
@@ -182,7 +182,7 @@ namespace Project
 				listAntialiasingAdditional.SelectItem( SimulationApp.AntialiasingAdditional );
 				listAntialiasingAdditional.SelectedIndexChanged += delegate ( UIList sender )
 				{
-					SimulationApp.AntialiasingAdditional = sender.SelectedItem;
+					SimulationApp.AntialiasingAdditional = (string)sender.SelectedItem.Value;
 				};
 			}
 
@@ -192,13 +192,13 @@ namespace Project
 				if( SystemSettings.LimitedDevice )
 				{
 					listAntialiasingMotion.ReadOnly = true;
-					listAntialiasingMotion.Items.RemoveAt( 2 );
+					listAntialiasingMotion.RemoveItem( 2 );
 				}
 
 				listAntialiasingMotion.SelectItem( SimulationApp.AntialiasingMotion );
 				listAntialiasingMotion.SelectedIndexChanged += delegate ( UIList sender )
 				{
-					SimulationApp.AntialiasingMotion = sender.SelectedItem;
+					SimulationApp.AntialiasingMotion = (string)sender.SelectedItem.Value;
 				};
 			}
 
@@ -208,7 +208,7 @@ namespace Project
 				listResolutionUpscaleMode.SelectItem( SimulationApp.ResolutionUpscaleMode );
 				listResolutionUpscaleMode.SelectedIndexChanged += delegate ( UIList sender )
 				{
-					SimulationApp.ResolutionUpscaleMode = sender.SelectedItem;
+					SimulationApp.ResolutionUpscaleMode = (string)sender.SelectedItem.Value;
 				};
 			}
 
@@ -218,12 +218,12 @@ namespace Project
 				listResolutionUpscaleTechnique.SelectItem( SimulationApp.ResolutionUpscaleTechnique );
 				listResolutionUpscaleTechnique.SelectedIndexChanged += delegate ( UIList sender )
 				{
-					SimulationApp.ResolutionUpscaleTechnique = sender.SelectedItem;
+					SimulationApp.ResolutionUpscaleTechnique = (string)sender.SelectedItem.Value;
 				};
 
 				//FSR is not supported on mobile
 				if( SystemSettings.LimitedDevice )
-					listResolutionUpscaleTechnique.Items.RemoveAt( 3 );
+					listResolutionUpscaleTechnique.RemoveItem( 3 );
 			}
 
 			var listVideoMode = GetListVideoMode();
@@ -231,7 +231,7 @@ namespace Project
 			{
 				foreach( var mode in SystemSettings.VideoModes )
 				{
-					listVideoMode.Items.Add( $"{mode.X}x{mode.Y}" );
+					listVideoMode.AddItem( $"{mode.X}x{mode.Y}" );
 					if( mode == SimulationApp.VideoMode )
 						listVideoMode.SelectedIndex = listVideoMode.Items.Count - 1;
 				}
@@ -239,7 +239,7 @@ namespace Project
 				{
 					if( sender.SelectedIndex > 0 )
 					{
-						var s = sender.SelectedItem;
+						var s = (string)sender.SelectedItem.Value;
 						var array = s.Split( new char[] { 'x' }, StringSplitOptions.RemoveEmptyEntries );
 						SimulationApp.VideoMode = new Vector2I( int.Parse( array[ 0 ].Trim() ), int.Parse( array[ 1 ].Trim() ) );
 					}

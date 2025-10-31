@@ -235,8 +235,9 @@ namespace NeoAxis
 			SoundPlay( TypeCached.SoundClick );
 			if( NetworkIsServer && TypeCached.SoundClick.ReferenceOrValueSpecified )
 			{
-				BeginNetworkMessageToEveryone( "SoundClick" );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "SoundClick" );
+				if( m != null )
+					m.End();
 			}
 
 			OnClick( initiator );
@@ -259,11 +260,11 @@ namespace NeoAxis
 
 			if( NetworkIsClient )
 			{
-				var writer = BeginNetworkMessageToServer( "TryClick" );
-				if( writer != null )
+				var m = BeginNetworkMessageToServer( "TryClick" );
+				if( m != null )
 				{
-					writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
-					EndNetworkMessage();
+					m.Writer.WriteVariableUInt64( initiator != null ? (ulong)initiator.NetworkID : 0 );
+					m.End();
 				}
 				return true;
 			}
@@ -277,8 +278,9 @@ namespace NeoAxis
 				SoundPlay( TypeCached.SoundClickingBegin );
 				if( NetworkIsServer && TypeCached.SoundClickingBegin.ReferenceOrValueSpecified )
 				{
-					BeginNetworkMessageToEveryone( "SoundClickingBegin" );
-					EndNetworkMessage();
+					var m = BeginNetworkMessageToEveryone( "SoundClickingBegin" );
+					if( m != null )
+						m.End();
 				}
 
 				ClickingBeginEvent?.Invoke( this );
@@ -301,8 +303,9 @@ namespace NeoAxis
 			SoundPlay( TypeCached.SoundClickingEnd );
 			if( NetworkIsServer && TypeCached.SoundClickingEnd.ReferenceOrValueSpecified )
 			{
-				BeginNetworkMessageToEveryone( "SoundClickingEnd" );
-				EndNetworkMessage();
+				var m = BeginNetworkMessageToEveryone( "SoundClickingEnd" );
+				if( m != null )
+					m.End();
 			}
 
 			ClickingEndEvent?.Invoke( this );
@@ -412,11 +415,14 @@ namespace NeoAxis
 		{
 			if( NetworkIsServer )
 			{
-				var writer = client != null ? BeginNetworkMessage( client, "Clicking" ) : BeginNetworkMessageToEveryone( "Clicking" );
-				writer.Write( clicking );
-				writer.WriteVariableUInt64( clickingInitiator != null ? (ulong)clickingInitiator.NetworkID : 0 );
-				writer.Write( (float)clickingCurrentTime );
-				EndNetworkMessage();
+				var m = client != null ? BeginNetworkMessage( client, "Clicking" ) : BeginNetworkMessageToEveryone( "Clicking" );
+				if( m != null )
+				{
+					m.Writer.Write( clicking );
+					m.Writer.WriteVariableUInt64( clickingInitiator != null ? (ulong)clickingInitiator.NetworkID : 0 );
+					m.Writer.Write( (float)clickingCurrentTime );
+					m.End();
+				}
 			}
 		}
 

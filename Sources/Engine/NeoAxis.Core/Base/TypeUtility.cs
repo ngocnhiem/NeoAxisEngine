@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace NeoAxis
 {
@@ -102,6 +103,36 @@ namespace NeoAxis
 			category = DisplayNameAddSpaces( category );
 
 			return category;
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public static Type[] GetGenericArgumentsInBaseTypes( Type type, Type findType )
+		{
+			var t = type;
+			do
+			{
+				if( t.IsGenericType && t.GetGenericTypeDefinition() == findType )
+					return t.GetGenericArguments();
+
+				t = t.BaseType;
+			} while( t != null );
+
+			return null;
+		}
+
+		[MethodImpl( (MethodImplOptions)512 )]
+		public static Type GetGenericArgumentInBaseTypes( Type type, Type findType, int index )
+		{
+			var t = type;
+			do
+			{
+				if( t.IsGenericType && t.GetGenericTypeDefinition() == findType )
+					return t.GetGenericArguments()[ index ];
+
+				t = t.BaseType;
+			} while( t != null );
+
+			return null;
 		}
 	}
 }

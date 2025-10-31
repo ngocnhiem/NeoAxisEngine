@@ -302,7 +302,7 @@ namespace NeoAxis
 
 		////////////////
 
-		public virtual int GetListItemIndexByScreenPosition( UIList control, Vector2 position ) { return -1; }
+		public virtual int GetListItemIndexByScreenPosition( UIList control, Vector2 position, ref bool overCheckbox ) { overCheckbox = false; return -1; }
 		public virtual void ListEnsureVisible( UIList control, int index ) { }
 
 		////////////////
@@ -497,85 +497,56 @@ namespace NeoAxis
 
 		protected virtual void OnRenderButton( UIButton control, CanvasRenderer renderer )
 		{
-			if( control.Parent as UIContextMenu != null )
+			var styleColor = ColorValue.Zero;
+			switch( control.State )
 			{
-				//context menu button
-
-				var styleColor = ColorValue.Zero;
-				switch( control.State )
-				{
-				case UIButton.StateEnum.Normal: styleColor = new ColorValue( 0.5, 0.5, 0.5 ); break;
-				case UIButton.StateEnum.Hover: styleColor = new ColorValue( 0.65, 0.65, 0.65 ); break;
-				case UIButton.StateEnum.Pushed: styleColor = new ColorValue( 0.8, 0.8, 0.8 ); break;
-				case UIButton.StateEnum.Highlighted: styleColor = new ColorValue( 0.6, 0.6, 0.6 ); break;
-				//case UIButton.StateEnum.Highlighted: styleColor = new ColorValue( 0.6, 0.6, 0 ); break;
-				case UIButton.StateEnum.Disabled: styleColor = new ColorValue( 0.8, 0.8, 0.8 ); break;
-					//case UIButton.StateEnum.Disabled: styleColor = new ColorValue( 0.5, 0.5, 0.5 ); break;
-				}
-
-				control.GetScreenRectangle( out var rect );
-				var color = styleColor.GetSaturate();
-				if( color.Alpha > 0 )
-				{
-					//back
-					renderer.AddQuad( rect, color );
-
-					//!!!!image
-
-					//text
-					var position = new Vector2( rect.Left + control.GetScreenOffsetByValueX( new UIMeasureValueDouble( UIMeasure.Units, 10 ) ), rect.GetCenter().Y ) + new Vector2( 0, renderer.DefaultFontSize / 10 );
-					var textColor = new ColorValue( 1, 1, 1 );
-					//var textColor = control.State == UIButton.StateEnum.Disabled ? new ColorValue( 0.7, 0.7, 0.7 ) : new ColorValue( 1, 1, 1 );
-					renderer.AddText( control.Text, position, EHorizontalAlignment.Left, EVerticalAlignment.Center, textColor );
-				}
+			case UIButton.StateEnum.Normal: styleColor = control.Focused ? new ColorValue( 0.75, 0.75, 0.75 ) : new ColorValue( 0.5, 0.5, 0.5 ); break;
+			//case UIButton.StateEnum.Normal: styleColor = new ColorValue( 0.5, 0.5, 0.5 ); break;
+			case UIButton.StateEnum.Hover: styleColor = new ColorValue( 0.65, 0.65, 0.65 ); break;
+			case UIButton.StateEnum.Pushed: styleColor = new ColorValue( 0.8, 0.8, 0.8 ); break;
+			case UIButton.StateEnum.Highlighted: styleColor = control.Focused ? new ColorValue( 0.8, 0.8, 0.8 ) : new ColorValue( 0.6, 0.6, 0.6 ); break;
+			//case UIButton.StateEnum.Highlighted: styleColor = new ColorValue( 0.6, 0.6, 0 ); break;
+			case UIButton.StateEnum.Disabled: styleColor = new ColorValue( 0.8, 0.8, 0.8 ); break;
+				//case UIButton.StateEnum.Disabled: styleColor = new ColorValue( 0.5, 0.5, 0.5 ); break;
 			}
-			else
+
+			control.GetScreenRectangle( out var rect );
+			var color = styleColor.GetSaturate();
+			if( color.Alpha > 0 )
 			{
-				//usual button
+				//back
+				renderer.AddQuad( rect, color );
 
-				var styleColor = ColorValue.Zero;
-				switch( control.State )
+				//image
+				if( control.Image.Value != null )
 				{
-				case UIButton.StateEnum.Normal: styleColor = control.Focused ? new ColorValue( 0.75, 0.75, 0.75 ) : new ColorValue( 0.5, 0.5, 0.5 ); break;
-				//case UIButton.StateEnum.Normal: styleColor = new ColorValue( 0.5, 0.5, 0.5 ); break;
-				case UIButton.StateEnum.Hover: styleColor = new ColorValue( 0.65, 0.65, 0.65 ); break;
-				case UIButton.StateEnum.Pushed: styleColor = new ColorValue( 0.8, 0.8, 0.8 ); break;
-				case UIButton.StateEnum.Highlighted: styleColor = control.Focused ? new ColorValue( 0.8, 0.8, 0.8 ) : new ColorValue( 0.6, 0.6, 0.6 ); break;
-				//case UIButton.StateEnum.Highlighted: styleColor = new ColorValue( 0.6, 0.6, 0 ); break;
-				case UIButton.StateEnum.Disabled: styleColor = new ColorValue( 0.8, 0.8, 0.8 ); break;
-					//case UIButton.StateEnum.Disabled: styleColor = new ColorValue( 0.5, 0.5, 0.5 ); break;
+					var image = control.Image.Value;
+					if( control.ReadOnlyInHierarchy && control.ImageDisabled.Value != null )
+						image = control.ImageDisabled.Value;
+					//if( control.ReadOnly && control.ImageDisabled.Value != null )
+					//	image = control.ImageDisabled.Value;
+
+					var imageRect = rect;
+					imageRect.Expand( -control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 4, 4 ) ) );
+					renderer.AddQuad( imageRect, new Rectangle( 0, 0, 1, 1 ), image, new ColorValue( 1, 1, 1 ), true );
 				}
 
-				control.GetScreenRectangle( out var rect );
-				var color = styleColor.GetSaturate();
-				if( color.Alpha > 0 )
+				//text
+				var fontSize = control.GetScreenOffsetByValueY( control.FontSize );
+				var position = rect.GetCenter() + new Vector2( 0, fontSize / 10 );
+				var align = EHorizontalAlignment.Center;
+				var textColor = new ColorValue( 1, 1, 1 );
+
+				//context menu specific
+				if( control.Parent as UIContextMenu != null )
 				{
-					//back
-					renderer.AddQuad( rect, color );
-
-					//image
-					if( control.Image.Value != null )
-					{
-						var image = control.Image.Value;
-						if( control.ReadOnlyInHierarchy && control.ImageDisabled.Value != null )
-							image = control.ImageDisabled.Value;
-						//if( control.ReadOnly && control.ImageDisabled.Value != null )
-						//	image = control.ImageDisabled.Value;
-
-						var imageRect = rect;
-						imageRect.Expand( -control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 4, 4 ) ) );
-						renderer.AddQuad( imageRect, new Rectangle( 0, 0, 1, 1 ), image, new ColorValue( 1, 1, 1 ), true );
-					}
-
-					//text
-					var fontSize = control.GetScreenOffsetByValueY( control.FontSize );
-					var position = rect.GetCenter() + new Vector2( 0, fontSize / 10 );
-					var textColor = new ColorValue( 1, 1, 1 );
-					renderer.AddText( renderer.DefaultFont, fontSize, control.Text, position, EHorizontalAlignment.Center, EVerticalAlignment.Center, textColor );
-
-					//var textColor = control.State == UIButton.StateEnum.Disabled ? new ColorValue( 0.7, 0.7, 0.7 ) : new ColorValue( 1, 1, 1 );
-					//renderer.AddText( control.Text, position, EHorizontalAlignment.Center, EVerticalAlignment.Center, textColor );
+					position = new Vector2(
+						rect.Left + control.GetScreenOffsetByValueX( new UIMeasureValueDouble( UIMeasure.Units, 6 ) ),
+						rect.GetCenter().Y + fontSize / 10 );
+					align = EHorizontalAlignment.Left;
 				}
+
+				renderer.AddText( renderer.DefaultFont, fontSize, control.Text, position, align, EVerticalAlignment.Center, textColor );
 			}
 		}
 
@@ -659,7 +630,6 @@ namespace NeoAxis
 			if( control.Checked.Value == UICheck.CheckValue.Indeterminate )
 				renderer.AddQuad( Multiply( imageRect, new Rectangle( 0.3, 0.3, 0.7, 0.7 ) ), checkColor * colorMultiplier );
 
-			//!!!!странно рисует чуть ниже, чем посередине
 			//text
 			var fontSize = control.GetScreenOffsetByValueY( control.FontSize );
 			renderer.AddText( renderer.DefaultFont, fontSize, " " + control.Text, new Vector2( imageRect.Right, imageRect.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, textColor * colorMultiplier );
@@ -801,7 +771,26 @@ namespace NeoAxis
 
 		protected virtual void OnRenderListItem( UIList control, CanvasRenderer renderer, int itemIndex, Rectangle itemRectangle, FontComponent font, double fontSize )
 		{
-			var item = control.Items[ itemIndex ];
+			var item = control.GetItem( itemIndex );
+			//var item = control.Items[ itemIndex ];
+
+			if( control.Multiselect )
+			{
+				var isSelected = false;
+				for( int n = 0; n < control.SelectedIndices.Length; n++ )
+				{
+					if( control.SelectedIndices[ n ] == itemIndex )
+					{
+						isSelected = true;
+						break;
+					}
+				}
+				if( isSelected )
+				{
+					var color2 = new ColorValue( 0.3, 0.3, 0.3 );
+					renderer.AddQuad( itemRectangle, color2 );
+				}
+			}
 
 			if( itemIndex == control.SelectedIndex )
 			{
@@ -810,7 +799,68 @@ namespace NeoAxis
 			}
 
 			var positionX = itemRectangle.Left + control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 2, 0 ) ).X;
-			renderer.AddText( font, fontSize, item, new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
+
+			//draw checkbox
+			if( control.Checkboxes )
+			{
+				var borderColor = control.Focused ? new ColorValue( 0.7, 0.7, 0.7 ) : new ColorValue( 0.5, 0.5, 0.5 );
+				var insideColor = new ColorValue( 0, 0, 0 );
+
+				var checkColor = new ColorValue( 1, 1, 0 );
+				var textColor = new ColorValue( 1, 1, 1 );
+
+				var checkedStatus = item.Checked;
+				//var checkedStatus = UICheck.CheckValue.Unchecked;
+				//if( itemIndex < control.ItemChecks.Count )
+				//	checkedStatus = control.ItemChecks[ itemIndex ];
+
+				var colorMultiplier = new ColorValue( 1, 1, 1 );
+				var checkBoxRect = new Rectangle( itemRectangle.Left, itemRectangle.Top, itemRectangle.Left + itemRectangle.Size.Y * renderer.AspectRatioInv, itemRectangle.Bottom );
+				var imageRect = Multiply( checkBoxRect, new Rectangle( 0.1, 0.1, 0.9, 0.9 ) );
+
+				renderer.AddQuad( imageRect, borderColor * colorMultiplier );
+				renderer.AddQuad( Multiply( imageRect, new Rectangle( 0.1, 0.1, 0.9, 0.9 ) ), insideColor * colorMultiplier );
+
+				//Checked image
+				if( checkedStatus == UICheck.CheckValue.Checked )
+				{
+					var points = new Vector2[]
+					{
+						new Vector2( 290.04, 33.286 ),
+						new Vector2( 118.861, 204.427 ),
+						new Vector2( 52.32, 137.907 ),
+						new Vector2( 0, 190.226 ),
+						new Vector2( 118.861, 309.071 ),
+						new Vector2( 342.357, 85.606 ),
+					};
+					var points2 = new Vector2[ points.Length ];
+					for( int n = 0; n < points2.Length; n++ )
+						points2[ n ] = points[ n ] / new Vector2( 342.357, 342.357 );
+
+					var color2 = checkColor * colorMultiplier;
+
+					var vertices = new CanvasRenderer.TriangleVertex[ points2.Length ];
+					for( int n = 0; n < points2.Length; n++ )
+						vertices[ n ] = new CanvasRenderer.TriangleVertex( Multiply( imageRect, points2[ n ] ).ToVector2F(), color2 );
+
+					var indices = new int[] { 0, 1, 5, 5, 4, 1, 1, 2, 3, 3, 1, 4 };
+
+					renderer.AddTriangles( vertices, indices );
+				}
+
+				//Indeterminate image
+				if( checkedStatus == UICheck.CheckValue.Indeterminate )
+					renderer.AddQuad( Multiply( imageRect, new Rectangle( 0.3, 0.3, 0.7, 0.7 ) ), checkColor * colorMultiplier );
+
+				//add offset to the text
+				positionX += checkBoxRect.Size.X;
+			}
+
+			//draw text
+			renderer.AddText( font, fontSize, item.Value.ToString(), new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
+
+			//var positionX = itemRectangle.Left + control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 2, 0 ) ).X;
+			//renderer.AddText( font, fontSize, item, new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
 		}
 
 		protected virtual void OnRenderList( UIList control, CanvasRenderer renderer )
@@ -933,7 +983,7 @@ namespace NeoAxis
 			}
 		}
 
-		public override int GetListItemIndexByScreenPosition( UIList control, Vector2 position )
+		public override int GetListItemIndexByScreenPosition( UIList control, Vector2 position, ref bool overCheckbox )
 		{
 			var renderer = control.ParentContainer.Viewport.CanvasRenderer;
 			if( renderer != null )
@@ -966,7 +1016,15 @@ namespace NeoAxis
 							itemRectangle.Right -= scrollBar.GetScreenSize().X;
 
 						if( itemRectangle.Intersects( rect2 ) && itemRectangle.Contains( position ) )
+						{
+							if( control.Checkboxes )
+							{
+								var checkBoxRect = new Rectangle( itemRectangle.Left, itemRectangle.Top, itemRectangle.Left + itemRectangle.Size.Y * renderer.AspectRatioInv, itemRectangle.Bottom );
+								overCheckbox = checkBoxRect.Contains( position );
+							}
+
 							return n;
+						}
 
 						positionY += itemSize;
 					}
@@ -1235,7 +1293,11 @@ namespace NeoAxis
 
 		protected virtual void OnRenderContextMenu( UIContextMenu menu, CanvasRenderer renderer )
 		{
-			var borderIndents = menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 10, 10 ) );
+			var itemSize = menu.ConvertOffsetY( menu.ItemSize, UIMeasure.Screen );
+			var itemFontSize = menu.ConvertOffsetY( menu.ItemFontSize, UIMeasure.Screen );
+
+			//to menu properties?
+			var borderIndents = menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 5, 5 ) );
 
 			var maxTextWidth = 0.0;
 			{
@@ -1244,17 +1306,16 @@ namespace NeoAxis
 					var item = itemBase as UIContextMenu.Item;
 					if( item != null )
 					{
-						var width = renderer.DefaultFont.GetTextLength( renderer.DefaultFontSize, renderer, item.Text );
+						var width = renderer.DefaultFont.GetTextLength( itemFontSize, renderer, item.Text );
 						if( width > maxTextWidth )
 							maxTextWidth = width;
 					}
 				}
 			}
 
-			var textHeight = renderer.DefaultFontSize;
+			var buttonSize = new Vector2( maxTextWidth, itemSize ) + menu.GetScreenOffsetByValue( menu.ItemMargin ) * 2;
 
-			var buttonSize = new Vector2( maxTextWidth, textHeight ) + menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 20, 20 ) );
-			var separatorHeight = menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 0, 10 ) ).Y;
+			var separatorHeight = menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 0, 4 ) ).Y;
 
 			//update menu rectangle
 			{
@@ -1304,7 +1365,7 @@ namespace NeoAxis
 						if( button.AnyData == item )
 							return button;
 					return null;
-				};
+				}
 
 				var currentPositionY = menu.GetScreenPosition().Y + borderIndents.Y;
 
@@ -1331,7 +1392,110 @@ namespace NeoAxis
 
 			//draw default background
 			if( menu.BackgroundColor.Value == ColorValue.Zero )
-				renderer.AddQuad( menu.GetScreenRectangle(), new ColorValue( 0.3, 0.3, 0.3 ) );
+			{
+				var roundingSize = borderIndents.Y * 1.5;
+				renderer.AddQuad( menu.GetScreenRectangle(), new ColorValue( 0.4, 0.4, 0.4 ) );
+			}
+
+
+
+			//var borderIndents = menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 5, 5 ) );
+
+			//var maxTextWidth = 0.0;
+			//{
+			//	foreach( var itemBase in menu.Items )
+			//	{
+			//		var item = itemBase as UIContextMenu.Item;
+			//		if( item != null )
+			//		{
+			//			var width = renderer.DefaultFont.GetTextLength( renderer.DefaultFontSize, renderer, item.Text );
+			//			if( width > maxTextWidth )
+			//				maxTextWidth = width;
+			//		}
+			//	}
+			//}
+
+			//var textHeight = renderer.DefaultFontSize;
+
+			//var buttonSize = new Vector2( maxTextWidth, textHeight ) + menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 20, 20 ) );
+			//var separatorHeight = menu.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 0, 4 ) ).Y;
+
+			////update menu rectangle
+			//{
+			//	var width = borderIndents.X * 2 + buttonSize.X;
+			//	var height = borderIndents.Y * 2;
+
+			//	foreach( var itemBase in menu.Items )
+			//	{
+			//		var item = itemBase as UIContextMenu.Item;
+			//		if( item != null )
+			//			height += buttonSize.Y;
+
+			//		var separator = itemBase as UIContextMenu.Separator;
+			//		if( separator != null )
+			//			height += separatorHeight;
+			//	}
+
+			//	//update menu rectangle
+
+			//	var rect = new Rectangle( menu.InitialScreenPosition, menu.InitialScreenPosition + new Vector2( width, height ) );
+
+			//	//fix rectangle when outside screen
+			//	if( rect.Right > 1 )
+			//	{
+			//		var offset = rect.Right - 1.0;
+			//		rect.Left -= offset;
+			//		rect.Right -= offset;
+			//	}
+			//	if( rect.Bottom > 1 )
+			//	{
+			//		var offset = rect.Bottom - 1.0;
+			//		rect.Top -= offset;
+			//		rect.Bottom -= offset;
+			//	}
+
+			//	menu.Margin = new UIMeasureValueRectangle( UIMeasure.Screen, new Rectangle( rect.LeftTop, Vector2.Zero ) );
+			//	menu.Size = new UIMeasureValueVector2( UIMeasure.Screen, rect.Size );
+			//}
+
+			////update buttons
+			//{
+			//	var buttons = menu.GetComponents<UIButton>();
+
+			//	UIButton GetButtonByItem( UIContextMenu.Item item )
+			//	{
+			//		foreach( var button in buttons )
+			//			if( button.AnyData == item )
+			//				return button;
+			//		return null;
+			//	}
+
+			//	var currentPositionY = menu.GetScreenPosition().Y + borderIndents.Y;
+
+			//	foreach( var itemBase in menu.Items )
+			//	{
+			//		var item = itemBase as UIContextMenu.Item;
+			//		if( item != null )
+			//		{
+			//			var button = GetButtonByItem( item );
+			//			if( button != null )
+			//			{
+			//				button.Margin = new UIMeasureValueRectangle( UIMeasure.Screen, menu.GetScreenPosition().X + borderIndents.X, currentPositionY, 0, 0 );
+			//				button.Size = new UIMeasureValueVector2( UIMeasure.Screen, buttonSize );
+
+			//				currentPositionY += buttonSize.Y;
+			//			}
+			//		}
+
+			//		var separator = itemBase as UIContextMenu.Separator;
+			//		if( separator != null )
+			//			currentPositionY += separatorHeight;
+			//	}
+			//}
+
+			////draw default background
+			//if( menu.BackgroundColor.Value == ColorValue.Zero )
+			//	renderer.AddQuad( menu.GetScreenRectangle(), new ColorValue( 0.3, 0.3, 0.3 ) );
 		}
 
 		protected virtual void OnRenderToolbar( UIToolbar control, CanvasRenderer renderer )

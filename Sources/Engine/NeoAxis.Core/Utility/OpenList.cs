@@ -31,6 +31,16 @@ namespace NeoAxis
 		{
 		}
 
+		public void EnsureCapacity( int capacity )
+		{
+			if( Data.Length < capacity )
+			{
+				var old = Data;
+				Data = new T[ capacity ];
+				Array.Copy( old, Data, old.Length );
+			}
+		}
+
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void Add( ref T item )
 		{
@@ -52,9 +62,19 @@ namespace NeoAxis
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
 		public void AddRange( IEnumerable<T> collection )
 		{
-			//!!!!slowly
-			foreach( var item in collection )
-				Add( item );
+			var collection2 = collection as ICollection<T>;
+			if( collection2 != null )
+			{
+				var newCount = Count + collection2.Count;
+				EnsureCapacity( newCount );
+				foreach( var item in collection2 )
+					Data[ Count++ ] = item;
+			}
+			else
+			{
+				foreach( var item in collection )
+					Add( item );
+			}
 		}
 
 		[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]

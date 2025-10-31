@@ -13,10 +13,10 @@ namespace NeoAxis
 	{
 		int receiveDataSizeLimit = 10 * 1024 * 1024;
 
-		MessageType transferMessageStringType;
-		MessageType transferMessageBinaryType;
-		MessageType messageToAllClientsStringType;
-		MessageType messageToAllClientsBinaryType;
+		MessageType transferMessageString;
+		MessageType transferMessageBinary;
+		MessageType messageToAllClientsString;
+		MessageType messageToAllClientsBinary;
 
 		///////////////////////////////////////////
 
@@ -38,10 +38,10 @@ namespace NeoAxis
 			: base( "Messages", 1 )
 		{
 			//register message types
-			transferMessageStringType = RegisterMessageType( "TransferMessageString", 1, ReceiveMessage_TransferMessageStringToServer );
-			transferMessageBinaryType = RegisterMessageType( "TransferMessageBinary", 2, ReceiveMessage_TransferMessageBinaryToServer );
-			messageToAllClientsStringType = RegisterMessageType( "MessageToAllClientsString", 3, ReceiveMessage_MessageToAllClientsStringToServer );
-			messageToAllClientsBinaryType = RegisterMessageType( "MessageToAllClientsBinary", 4, ReceiveMessage_MessageToAllClientsBinaryToServer );
+			transferMessageString = RegisterMessageType( "TransferMessageString", 1, ReceiveMessage_TransferMessageStringToServer );
+			transferMessageBinary = RegisterMessageType( "TransferMessageBinary", 2, ReceiveMessage_TransferMessageBinaryToServer );
+			messageToAllClientsString = RegisterMessageType( "MessageToAllClientsString", 3, ReceiveMessage_MessageToAllClientsStringToServer );
+			messageToAllClientsBinary = RegisterMessageType( "MessageToAllClientsBinary", 4, ReceiveMessage_MessageToAllClientsBinaryToServer );
 		}
 
 		public int ReceiveDataSizeLimit
@@ -52,8 +52,8 @@ namespace NeoAxis
 
 		bool ReceiveMessage_TransferMessageStringToServer( ServerNode.Client sender, MessageType messageType, ArrayDataReader reader, ref string error )
 		{
-			string message = reader.ReadString();
-			string data = reader.ReadString();
+			string message = reader.ReadString() ?? string.Empty;
+			string data = reader.ReadString() ?? string.Empty;
 			if( !reader.Complete() )
 				return false;
 
@@ -64,7 +64,7 @@ namespace NeoAxis
 
 		bool ReceiveMessage_TransferMessageBinaryToServer( ServerNode.Client sender, MessageType messageType, ArrayDataReader reader, ref string error )
 		{
-			string message = reader.ReadString();
+			string message = reader.ReadString() ?? string.Empty;
 
 			var dataSize = reader.ReadInt32();
 
@@ -87,8 +87,8 @@ namespace NeoAxis
 
 		bool ReceiveMessage_MessageToAllClientsStringToServer( ServerNode.Client sender, MessageType messageType, ArrayDataReader reader, ref string error )
 		{
-			string message = reader.ReadString();
-			string data = reader.ReadString();
+			string message = reader.ReadString() ?? string.Empty;
+			string data = reader.ReadString() ?? string.Empty;
 			if( !reader.Complete() )
 				return false;
 
@@ -103,7 +103,7 @@ namespace NeoAxis
 
 		bool ReceiveMessage_MessageToAllClientsBinaryToServer( ServerNode.Client sender, MessageType messageType, ArrayDataReader reader, ref string error )
 		{
-			string message = reader.ReadString();
+			string message = reader.ReadString() ?? string.Empty;
 			var dataSize = reader.ReadInt32();
 
 			if( dataSize > ReceiveDataSizeLimit )
@@ -128,48 +128,58 @@ namespace NeoAxis
 
 		public void SendToClient( ServerNode.Client client, string message, string data )
 		{
-			var writer = BeginMessage( client, transferMessageStringType );
-			writer.Write( message );
-			writer.Write( data );
-			EndMessage();
+			var m = BeginMessage( client, transferMessageString );
+			m.Writer.Write( message );
+			m.Writer.Write( data );
+			m.End();
 		}
 
 		public void SendToClient( ServerNode.Client client, string message, byte[] data )
 		{
-			var writer = BeginMessage( client, transferMessageBinaryType );
-			writer.Write( message );
-			writer.Write( data.Length );
-			writer.Write( data );
-			EndMessage();
+			var m = BeginMessage( client, transferMessageBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Length );
+			m.Writer.Write( data );
+			m.End();
+		}
+
+		public void SendToClient( ServerNode.Client client, string message, ArraySegment<byte> data )
+		{
+			var m = BeginMessage( client, transferMessageBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Count );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
 
 		public void SendToAllClients( string message, string data )
 		{
-			//!!!!broadcast
-			//!!!!где еще. сцену раздавать всем броадкастом
+			//!!!!broadcast? where else
 
-			var writer = BeginMessageToEveryone( transferMessageStringType );
-			writer.Write( message );
-			writer.Write( data );
-			EndMessage();
-
-			//foreach( NetworkNode.ConnectedNode connectedNode in Owner.ConnectedNodes )
-			//	SendToClient( connectedNode, message, data );
+			var m = BeginMessageToAll( transferMessageString );
+			m.Writer.Write( message );
+			m.Writer.Write( data );
+			m.End();
 		}
 
 		public void SendToAllClients( string message, byte[] data )
 		{
-			//!!!!broadcast
-			//!!!!где еще. сцену раздавать всем броадкастом
+			var m = BeginMessageToAll( transferMessageBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Length );
+			m.Writer.Write( data );
+			m.End();
+		}
 
-			var writer = BeginMessageToEveryone( transferMessageBinaryType );
-			writer.Write( message );
-			writer.Write( data.Length );
-			writer.Write( data );
-			EndMessage();
+		public void SendToAllClients( string message, ArraySegment<byte> data )
+		{
+			//!!!!broadcast? where else
 
-			//foreach( NetworkNode.ConnectedNode connectedNode in Owner.ConnectedNodes )
-			//	SendToClient( connectedNode, message, data );
+			var m = BeginMessageToAll( transferMessageBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Count );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
 		}
 	}
 
@@ -180,10 +190,10 @@ namespace NeoAxis
 	/// </summary>
 	public class ClientNetworkService_Messages : ClientService
 	{
-		MessageType transferMessageStringType;
-		MessageType transferMessageBinaryType;
-		MessageType messageToAllClientsStringType;
-		MessageType messageToAllClientsBinaryType;
+		MessageType transferMessageString;
+		MessageType transferMessageBinary;
+		MessageType messageToAllClientsString;
+		MessageType messageToAllClientsBinary;
 
 		///////////////////////////////////////////
 
@@ -199,73 +209,16 @@ namespace NeoAxis
 			: base( "Messages", 1 )
 		{
 			//register message types
-			transferMessageStringType = RegisterMessageType( "TransferMessageString", 1, ReceiveMessage_TransferMessageStringToClient );
-			transferMessageBinaryType = RegisterMessageType( "TransferMessageBinary", 2, ReceiveMessage_TransferMessageBinaryToClient );
-			messageToAllClientsStringType = RegisterMessageType( "MessageToAllClientsString", 3 );
-			messageToAllClientsBinaryType = RegisterMessageType( "MessageToAllClientsBinary", 4 );
+			transferMessageString = RegisterMessageType( "TransferMessageString", 1, ReceiveMessage_TransferMessageStringToClient );
+			transferMessageBinary = RegisterMessageType( "TransferMessageBinary", 2, ReceiveMessage_TransferMessageBinaryToClient );
+			messageToAllClientsString = RegisterMessageType( "MessageToAllClientsString", 3 );
+			messageToAllClientsBinary = RegisterMessageType( "MessageToAllClientsBinary", 4 );
 		}
-
-		public void SendToServer( string message, string data )
-		{
-			var writer = BeginMessage( transferMessageStringType );
-			writer.Write( message );
-			writer.Write( data );
-			EndMessage();
-		}
-
-		public void SendToServer( string message, byte[] data, int offset, int length )
-		{
-			var writer = BeginMessage( transferMessageBinaryType );
-			writer.Write( message );
-			writer.Write( length );
-			writer.Write( data, offset, length );
-			EndMessage();
-		}
-
-		public void SendToServer( string message, byte[] data )
-		{
-			SendToServer( message, data, 0, data.Length );
-		}
-
-		public void SendToAllClients( string message, string data )
-		{
-			var writer = BeginMessage( messageToAllClientsStringType );
-			writer.Write( message );
-			writer.Write( data );
-			EndMessage();
-		}
-
-		public void SendToAllClients( string message, byte[] data, int offset, int length )
-		{
-			var writer = BeginMessage( messageToAllClientsBinaryType );
-			writer.Write( message );
-			writer.Write( length );
-			writer.Write( data, offset, length );
-			EndMessage();
-		}
-
-		public void SendToAllClients( string message, byte[] data )
-		{
-			SendToAllClients( message, data, 0, data.Length );
-		}
-
-
-		//public ArrayDataWriter SendToServerBinaryBegin( string message )
-		//{
-		//	var writer = BeginMessage( transferMessageBinaryType );
-		//	writer.Write( message );
-		//	return writer;
-		//}
-
-		//public void SendToServerBinaryEnd()
-		//{
-		//	EndMessage();
-		//}
 
 		bool ReceiveMessage_TransferMessageStringToClient( MessageType messageType, ArrayDataReader reader, ref string additionalErrorMessage )
 		{
-			string message = reader.ReadString();
-			string data = reader.ReadString();
+			string message = reader.ReadString() ?? string.Empty;
+			string data = reader.ReadString() ?? string.Empty;
 			if( !reader.Complete() )
 				return false;
 
@@ -276,7 +229,7 @@ namespace NeoAxis
 
 		bool ReceiveMessage_TransferMessageBinaryToClient( MessageType messageType, ArrayDataReader reader, ref string additionalErrorMessage )
 		{
-			string message = reader.ReadString();
+			string message = reader.ReadString() ?? string.Empty;
 			var dataSize = reader.ReadInt32();
 
 			var data = new byte[ dataSize ];
@@ -287,6 +240,58 @@ namespace NeoAxis
 			ReceiveMessageBinary?.Invoke( this, message, data );
 
 			return true;
+		}
+
+		public void SendToServer( string message, string data )
+		{
+			var m = BeginMessage( transferMessageString );
+			m.Writer.Write( message );
+			m.Writer.Write( data );
+			m.End();
+		}
+
+		public void SendToServer( string message, ArraySegment<byte> data )
+		{
+			var m = BeginMessage( transferMessageBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Count );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
+		}
+
+		public void SendToServer( string message, byte[] data )
+		{
+			var m = BeginMessage( transferMessageBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Length );
+			m.Writer.Write( data );
+			m.End();
+		}
+
+		public void SendToServerWithForwardToAllClients( string message, string data )
+		{
+			var m = BeginMessage( messageToAllClientsString );
+			m.Writer.Write( message );
+			m.Writer.Write( data );
+			m.End();
+		}
+
+		public void SendToServerWithForwardToAllClients( string message, ArraySegment<byte> data )
+		{
+			var m = BeginMessage( messageToAllClientsBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Count );
+			m.Writer.Write( data.Array, data.Offset, data.Count );
+			m.End();
+		}
+
+		public void SendToServerWithForwardToAllClients( string message, byte[] data )
+		{
+			var m = BeginMessage( messageToAllClientsBinary );
+			m.Writer.Write( message );
+			m.Writer.Write( data.Length );
+			m.Writer.Write( data );
+			m.End();
 		}
 	}
 }

@@ -60,7 +60,7 @@ namespace NeoAxis
 		//cursor
 		//это скорее App & Window Management
 		static bool showCursor = true;
-		static string systemCursorFileName = "";
+		static string customCursorFileName = "";
 		static Vector2 lastMousePositionForCursorUpdate;
 
 		//rendering
@@ -444,6 +444,10 @@ namespace NeoAxis
 
 			//!!!!всё тут
 
+			//internal bool cursorWasUpdatedFirstTime;
+
+			/////////////////////
+
 			//public Viewport Viewport
 			//{
 			//	get { return viewport; }
@@ -808,7 +812,7 @@ namespace NeoAxis
 				Log.InvisibleInfo( "Runtime Framework: " + SystemSettings.GetNetRuntimeDisplayName() );
 				Log.InvisibleInfo( "NeoAxis version: " + EngineInfo.Version.ToString() );
 				Log.InvisibleInfo( "Application type: " + ApplicationType.ToString() );
-				Log.InvisibleInfo( "Engine mode: " + EngineInfo.EngineMode.ToString() );
+				//Log.InvisibleInfo( "Engine mode: " + EngineInfo.EngineMode.ToString() );
 				//Log.InvisibleInfo( "AppContainer: " + SystemSettings.AppContainer.ToString() );
 			}
 
@@ -1877,6 +1881,17 @@ end:;
 			if( !IsWindowVisibleAndValidSize() )
 				return;
 
+			//update cursor for the first time when using the created window mode
+			if( platform != null && createdInsideEngineWindow != null && createdInsideEngineWindow.Focused &&
+				new Rectangle( 0, 0, 1, 1 ).Contains( RenderingSystem.ApplicationRenderTarget.Viewports[ 0 ].MousePosition ) )
+			{
+				//if( !createdInsideEngineWindow.cursorWasUpdatedFirstTime )
+				//{
+				platform.CreatedWindow_UpdateSystemCursorFileName();
+				//	createdInsideEngineWindow.cursorWasUpdatedFirstTime = true;
+				//}
+			}
+
 			if( duringRenderScene )
 				return;
 			try
@@ -1939,30 +1954,28 @@ end:;
 			{
 				if( showCursor == value )
 					return;
-
 				showCursor = value;
 
-				//!!!!было
-				//!!!!!не так скорее всего всё это
-				//if( platform != null && createdInsideEngineWindow != null && createdInsideEngineWindow.Focused /*IsWindowFocused()*/ &&
-				//	new Rect( 0, 0, 1, 1 ).IsContainsPoint( RendererWorld.ApplicationRenderTarget.Viewports[ 0 ].MousePosition ) )
-				//{
-				//	//if( platform != null && created && !closing && ApplicationWindow.Focused )// IsWindowFocused() )
-				//	platform.UpdateShowSystemCursor();
-				//}
+				//update cursor
+				if( platform != null && createdInsideEngineWindow != null && createdInsideEngineWindow.Focused &&
+					new Rectangle( 0, 0, 1, 1 ).Contains( RenderingSystem.ApplicationRenderTarget.Viewports[ 0 ].MousePosition ) )
+				{
+					platform.CreatedWindow_UpdateSystemCursorFileName();
+				}
 			}
 		}
 
-		public static string SystemCursorFileName
+		public static string CustomCursorFileName
 		{
-			get { return systemCursorFileName; }
+			get { return customCursorFileName; }
 			set
 			{
-				systemCursorFileName = value;
+				if( customCursorFileName == value )
+					return;
+				customCursorFileName = value;
 
-				//!!!!!было
-				//!!!!!не так скорее всего всё это
-				if( platform != null && createdInsideEngineWindow != null && createdInsideEngineWindow.Focused /*IsWindowFocused()*/ &&
+				//update cursor
+				if( platform != null && createdInsideEngineWindow != null && createdInsideEngineWindow.Focused &&
 					new Rectangle( 0, 0, 1, 1 ).Contains( RenderingSystem.ApplicationRenderTarget.Viewports[ 0 ].MousePosition ) )
 				{
 					platform.CreatedWindow_UpdateSystemCursorFileName();

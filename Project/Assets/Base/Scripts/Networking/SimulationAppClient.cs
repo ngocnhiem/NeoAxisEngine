@@ -38,7 +38,8 @@ namespace Project
 			ClientNetworkService_Users users;
 			ClientNetworkService_Chat chat;
 			ClientNetworkService_Components components;
-			ClientNetworkService_FileSync fileSync;
+			//!!!!CloudFunctions
+			//ClientNetworkService_FileSync fileSync;
 
 			//
 
@@ -60,9 +61,9 @@ namespace Project
 				components = new ClientNetworkService_Components( users );
 				RegisterService( components );
 
-				//register file sync service
-				fileSync = new ClientNetworkService_FileSync();
-				RegisterService( fileSync );
+				////register file sync service
+				//fileSync = new ClientNetworkService_FileSync();
+				//RegisterService( fileSync );
 			}
 
 			public ClientNetworkService_Messages Messages
@@ -85,10 +86,10 @@ namespace Project
 				get { return components; }
 			}
 
-			public ClientNetworkService_FileSync FileSync
-			{
-				get { return fileSync; }
-			}
+			//public ClientNetworkService_FileSync FileSync
+			//{
+			//	get { return fileSync; }
+			//}
 		}
 
 		/////////////////////////////////////////
@@ -157,14 +158,15 @@ namespace Project
 					return false;
 				}
 
-				//get appContainer
-				if( SystemSettings.CommandLineParameters.TryGetValue( "-appContainer", out var appContainer ) && appContainer == "1" )
-					SystemSettings.AppContainer = true;
+				//!!!!no sense
+				////get appContainer
+				//if( SystemSettings.CommandLineParameters.TryGetValue( "-appContainer", out var appContainer ) && appContainer == "1" )
+				//	SystemSettings.AppContainer = true;
 
 				Log.InvisibleInfo( "SimulationAppClient: GetInitSettings: Network mode: " + networkMode.ToString() );
 				Log.InvisibleInfo( "SimulationAppClient: GetInitSettings: Server address: " + serverAddress );
 				Log.InvisibleInfo( "SimulationAppClient: GetInitSettings: Server port: " + serverPort.ToString() );
-				Log.InvisibleInfo( "SimulationAppClient: GetInitSettings: AppContainer: " + SystemSettings.AppContainer.ToString() );
+				//Log.InvisibleInfo( "SimulationAppClient: GetInitSettings: AppContainer: " + SystemSettings.AppContainer.ToString() );
 
 				if( networkMode == NetworkModeEnum.CloudProject )
 				{
@@ -330,10 +332,12 @@ namespace Project
 					lines.Add( "SimulationAppClient is created." );
 					lines.Add( "Connection status: " + client.Status.ToString() );
 
-					var fileSyncStatus = client.FileSync.Status;
-					lines.Add( "File sync status: " + fileSyncStatus.Status.ToString() );
-					if( fileSyncStatus.Status == ClientNetworkService_FileSync.StatusEnum.Error )
-						lines.Add( "File sync error: " + fileSyncStatus.Error );
+					//!!!!
+
+					//var fileSyncStatus = client.FileSync.Status;
+					//lines.Add( "File sync status: " + fileSyncStatus.Status.ToString() );
+					//if( fileSyncStatus.Status == ClientNetworkService_FileSync.StatusEnum.Error )
+					//	lines.Add( "File sync error: " + fileSyncStatus.Error );
 				}
 
 				if( !string.IsNullOrEmpty( LastError ) )

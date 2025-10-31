@@ -640,23 +640,6 @@ namespace NeoAxis
 
 			/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-			[MethodImpl( MethodImplOptions.AggressiveInlining | (MethodImplOptions)512 )]
-			static Type GetGenericArgumentInBaseTypes( Type type, Type findType, int index )
-			{
-				var t = type;
-				do
-				{
-					if( t.IsGenericType && t.GetGenericTypeDefinition() == findType )
-						return t.GetGenericArguments()[ index ];
-
-					t = t.BaseType;
-				} while( t != null );
-
-				return null;
-			}
-
-			/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 			[MethodImpl( (MethodImplOptions)512 )]
 			public static void RegisterListSet( Type containerType )
 			{
@@ -692,7 +675,7 @@ namespace NeoAxis
 							if( referenceList != null )
 								elementNetType = referenceList.GetItemType();
 							else
-								elementNetType = GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
+								elementNetType = TypeUtility.GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
 							var elementType = GetTypeOfNetType( elementNetType );
 
 							string addName;
@@ -865,7 +848,7 @@ namespace NeoAxis
 						if( referenceList != null )
 							elementNetType = referenceList.GetItemType();
 						else
-							elementNetType = GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
+							elementNetType = TypeUtility.GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
 						var elementType = GetTypeOfNetType( elementNetType );
 
 						object valueEnumerate = value;
@@ -953,7 +936,6 @@ namespace NeoAxis
 					var referenceList = value as IReferenceList;
 
 					object newValue = null;
-					//!!!!new
 					if( referenceList != null )
 						newValue = property.GetValue( newObject, null );
 					else
@@ -970,7 +952,7 @@ namespace NeoAxis
 						if( referenceList != null )
 							elementNetType = referenceList.GetItemType();
 						else
-							elementNetType = GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
+							elementNetType = TypeUtility.GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
 
 						string addName;
 						if( containerType == typeof( Stack<> ) )
@@ -980,8 +962,6 @@ namespace NeoAxis
 						else
 							addName = "Add";
 
-						////!!!!new. ReferenceList fix
-						//MethodInfo methodAdd = newValue.GetType().GetMethod( addName );
 						MethodInfo methodAdd = newValue.GetType().GetMethod( addName, new Type[] { elementNetType } );
 
 						//!!!!!check
@@ -1025,8 +1005,8 @@ namespace NeoAxis
 							type.GetNetType().GetMethod( "Clear", new Type[ 0 ] ).Invoke( value, new object[ 0 ] );
 						}
 
-						var keyNetType = GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
-						var valueNetType = GetGenericArgumentInBaseTypes( value.GetType(), containerType, 1 );
+						var keyNetType = TypeUtility.GetGenericArgumentInBaseTypes( value.GetType(), containerType, 0 );
+						var valueNetType = TypeUtility.GetGenericArgumentInBaseTypes( value.GetType(), containerType, 1 );
 						var keyType = GetTypeOfNetType( keyNetType );
 						var valueType = GetTypeOfNetType( valueNetType );
 

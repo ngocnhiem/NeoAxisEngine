@@ -293,9 +293,10 @@ namespace Project
 
 		void SendUsersInfoToClients()
 		{
-			var writer = BeginNetworkMessageToEveryone( "UsersInfo" );
-			if( writer != null )
+			var m = BeginNetworkMessageToEveryone( "UsersInfo" );
+			if( m != null )
 			{
+				var writer = m.Writer;
 				var users = ServerGetUsers();
 
 				writer.WriteVariableInt32( users.Length );
@@ -305,7 +306,7 @@ namespace Project
 					writer.WriteVariableInt32( item.Points );
 					writer.WriteVariableInt32( item.Team );
 				}
-				EndNetworkMessage();
+				m.End();
 			}
 		}
 
@@ -501,7 +502,7 @@ namespace Project
 					//add player's point
 					if( oldHealth > 0 && sender.Health.Value <= 0 )
 					{
-						var whoFiredUser = SimulationAppServer.Server.Users.GetUser( whoFired );
+						var whoFiredUser = SimulationAppServer.ServerNode.Users.GetUser( whoFired );
 						if( whoFiredUser != null )
 						{
 							var creatorUserItem = ServerGetUser( whoFiredUser );

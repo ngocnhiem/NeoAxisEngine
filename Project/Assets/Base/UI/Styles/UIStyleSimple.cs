@@ -241,7 +241,6 @@ namespace Project
 			if( control.Checked.Value == UICheck.CheckValue.Indeterminate )
 				renderer.AddQuad( Multiply( imageRect, new Rectangle( 0.3, 0.3, 0.7, 0.7 ) ), checkColor * colorMultiplier );
 
-			//!!!!странно рисует чуть ниже, чем посередине
 			//text
 			var fontSize = control.GetScreenOffsetByValueY( control.FontSize );
 			renderer.AddText( renderer.DefaultFont, fontSize, " " + control.Text, new Vector2( imageRect.Right, imageRect.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, textColor * colorMultiplier );
@@ -277,7 +276,25 @@ namespace Project
 
 		protected override void OnRenderListItem( UIList control, CanvasRenderer renderer, int itemIndex, Rectangle itemRectangle, FontComponent font, double fontSize )
 		{
-			var item = control.Items[ itemIndex ];
+			var item = control.GetItem( itemIndex );// Items[ itemIndex ];
+
+			if( control.Multiselect )
+			{
+				var isSelected = false;
+				for( int n = 0; n < control.SelectedIndices.Length; n++ )
+				{
+					if( control.SelectedIndices[ n ] == itemIndex )
+					{
+						isSelected = true;
+						break;
+					}
+				}
+				if( isSelected )
+				{
+					var color2 = new ColorValue( 0.1, 0.1, 0.5 );
+					renderer.AddQuad( itemRectangle, color2 );
+				}
+			}
 
 			if( itemIndex == control.SelectedIndex )
 			{
@@ -286,7 +303,78 @@ namespace Project
 			}
 
 			var positionX = itemRectangle.Left + control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 2, 0 ) ).X;
-			renderer.AddText( font, fontSize, item, new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
+
+			//draw checkbox
+			if( control.Checkboxes )
+			{
+				var borderColor = control.Focused ? new ColorValue( 0.7, 0.7, 0.7 ) : new ColorValue( 0.5, 0.5, 0.5 );
+				var insideColor = new ColorValue( 0, 0, 0 );
+
+				var checkColor = new ColorValue( 1, 1, 0 );
+				var textColor = new ColorValue( 1, 1, 1 );
+
+				var checkedStatus = item.Checked;
+				//var checkedStatus = UICheck.CheckValue.Unchecked;
+				//if( itemIndex < control.ItemChecks.Count )
+				//	checkedStatus = control.ItemChecks[ itemIndex ];
+
+				//switch( control.State )
+				//{
+				//case UICheck.StateEnum.Pushed:
+				//	checkColor = new ColorValue( 1, 1, 1 );
+				//	break;
+
+				//case UICheck.StateEnum.Disabled:
+				//	borderColor = new ColorValue( 0.8, 0.8, 0.8 );
+				//	checkColor = new ColorValue( 0.8, 0.8, 0.8 );
+				//	textColor = new ColorValue( 1, 1, 1 );
+				//	break;
+				//}
+
+				var colorMultiplier = new ColorValue( 1, 1, 1 );
+				var checkBoxRect = new Rectangle( itemRectangle.Left, itemRectangle.Top, itemRectangle.Left + itemRectangle.Size.Y * renderer.AspectRatioInv, itemRectangle.Bottom );
+				var imageRect = Multiply( checkBoxRect, new Rectangle( 0.1, 0.1, 0.9, 0.9 ) );
+
+				renderer.AddQuad( imageRect, borderColor * colorMultiplier );
+				renderer.AddQuad( Multiply( imageRect, new Rectangle( 0.1, 0.1, 0.9, 0.9 ) ), insideColor * colorMultiplier );
+
+				//Checked image
+				if( checkedStatus == UICheck.CheckValue.Checked )
+				{
+					var points = new Vector2[]
+					{
+						new Vector2( 290.04, 33.286 ),
+						new Vector2( 118.861, 204.427 ),
+						new Vector2( 52.32, 137.907 ),
+						new Vector2( 0, 190.226 ),
+						new Vector2( 118.861, 309.071 ),
+						new Vector2( 342.357, 85.606 ),
+					};
+					var points2 = new Vector2[ points.Length ];
+					for( int n = 0; n < points2.Length; n++ )
+						points2[ n ] = points[ n ] / new Vector2( 342.357, 342.357 );
+
+					var color2 = checkColor * colorMultiplier;
+
+					var vertices = new CanvasRenderer.TriangleVertex[ points2.Length ];
+					for( int n = 0; n < points2.Length; n++ )
+						vertices[ n ] = new CanvasRenderer.TriangleVertex( Multiply( imageRect, points2[ n ] ).ToVector2F(), color2 );
+
+					var indices = new int[] { 0, 1, 5, 5, 4, 1, 1, 2, 3, 3, 1, 4 };
+
+					renderer.AddTriangles( vertices, indices );
+				}
+
+				//Indeterminate image
+				if( checkedStatus == UICheck.CheckValue.Indeterminate )
+					renderer.AddQuad( Multiply( imageRect, new Rectangle( 0.3, 0.3, 0.7, 0.7 ) ), checkColor * colorMultiplier );
+
+				//add offset to the text
+				positionX += checkBoxRect.Size.X;
+			}
+
+			//draw text
+			renderer.AddText( font, fontSize, item.Value.ToString(), new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
 		}
 
 		protected override void OnRenderList( UIList control, CanvasRenderer renderer )
@@ -416,9 +504,9 @@ namespace Project
 			//base.OnRenderList( control, renderer );
 		}
 
-		public override int GetListItemIndexByScreenPosition( UIList control, Vector2 position )
+		public override int GetListItemIndexByScreenPosition( UIList control, Vector2 position, ref bool overCheckbox )
 		{
-			return base.GetListItemIndexByScreenPosition( control, position );
+			return base.GetListItemIndexByScreenPosition( control, position, ref overCheckbox );
 		}
 
 		/////////////////////////////////////////

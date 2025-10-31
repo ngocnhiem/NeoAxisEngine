@@ -38,7 +38,7 @@ namespace Project
 
 				positionX += imageSizeX + control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 8, 0 ) ).X;
 
-				renderer.AddText( font, fontSize, item, new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
+				renderer.AddText( font, fontSize, item.Value.ToString(), new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
 
 				//var positionX = itemRectangle.Left + control.GetScreenOffsetByValue( new UIMeasureValueVector2( UIMeasure.Units, 2, 0 ) ).X;
 				//renderer.AddText( font, fontSize, item, new Vector2( positionX, itemRectangle.GetCenter().Y ), EHorizontalAlignment.Left, EVerticalAlignment.Center, new ColorValue( 1, 1, 1 ) );
@@ -166,7 +166,7 @@ namespace Project
 
 			var list = GetList();
 			if( list.SelectedIndex != -1 )
-				result.NamedCharacter = list.SelectedItem;
+				result.NamedCharacter = list.SelectedItem.Value.ToString();
 
 			return result;
 		}
@@ -175,7 +175,7 @@ namespace Project
 		{
 			var list = GetList();
 
-			list.Items.Add( "Bryce" );
+			list.AddItem( "Bryce" );
 
 			//list.Items.Add( "Swat Guy" );
 			//list.Items.Add( "Kachujin" );

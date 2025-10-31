@@ -197,7 +197,7 @@
 					Size = Units 330 90
 					Margin = Units 20 230 0 0
 					EditorScrollPosition = 0 0
-					Items
+					ItemsAsText
 					{
 						Count = 1
 						0 = Default
@@ -300,7 +300,7 @@
 					Size = Units 160 190
 					Margin = Units 20 90 0 0
 					EditorScrollPosition = 0 0
-					Items
+					ItemsAsText
 					{
 						Count = 7
 						0 = Default
@@ -329,7 +329,7 @@
 					Size = Units 160 80
 					Margin = Units 190 90 0 0
 					EditorScrollPosition = 0 0
-					Items
+					ItemsAsText
 					{
 						Count = 3
 						0 = Default
@@ -354,7 +354,7 @@
 					Size = Units 160 80
 					Margin = Units 190 200 0 0
 					EditorScrollPosition = 0 0
-					Items
+					ItemsAsText
 					{
 						Count = 3
 						0 = Default
@@ -379,7 +379,7 @@
 					Size = Units 160 150
 					Margin = Units 20 370 0 0
 					EditorScrollPosition = 0 0
-					Items
+					ItemsAsText
 					{
 						Count = 6
 						0 = Default
@@ -407,7 +407,7 @@
 					Size = Units 160 150
 					Margin = Units 190 370 0 0
 					EditorScrollPosition = 0 0
-					Items
+					ItemsAsText
 					{
 						Count = 4
 						0 = Default

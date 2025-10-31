@@ -95,7 +95,7 @@ namespace NeoAxis
 			{
 				var connection = "shared";
 				//if( ( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.WorldsClient || EngineInfo.EngineMode == EngineInfo.EngineModeEnum.WorldsServer ) && EngineApp.IsSimulation )
-				if( SystemSettings.AppContainer )
+				if( SystemSettings.CloudAppContainer )
 					connection = "direct";
 
 				var connectionString = $"Filename={DatabaseFileName};Connection={connection};Upgrade=true";

@@ -91,7 +91,7 @@ namespace NeoAxis
 							var connection = supportShared ? "shared" : "direct";
 
 							//if( ( EngineInfo.EngineMode == EngineInfo.EngineModeEnum.WorldsClient || EngineInfo.EngineMode == EngineInfo.EngineModeEnum.WorldsServer ) && EngineApp.IsSimulation )
-							if( SystemSettings.AppContainer )
+							if( SystemSettings.CloudAppContainer )
 								connection = "direct";
 
 							var connectionString = $"Filename={fileName};Connection={connection};Upgrade=true";

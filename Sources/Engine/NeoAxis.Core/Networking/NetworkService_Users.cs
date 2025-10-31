@@ -4,35 +4,37 @@ using System.Collections.Generic;
 using System.Text;
 using System.Net;
 using NeoAxis.Networking;
+using System.Collections.Concurrent;
+using System.Threading;
 
 namespace NeoAxis
 {
 	public class ServerNetworkService_Users : ServerService
 	{
-		Dictionary<long, UserInfo> usersByID = new Dictionary<long, UserInfo>();
-		Dictionary<ServerNode.Client, UserInfo> usersByClient = new Dictionary<ServerNode.Client, UserInfo>();
+		MessageType addUserToClient;
+		MessageType removeUserToClient;
+		MessageType updateObjectControlledByPlayerToClient;
+
+		ConcurrentDictionary<long, UserInfo> usersByID = new ConcurrentDictionary<long, UserInfo>();
+		ConcurrentDictionary<ServerNode.Client, UserInfo> usersByClient = new ConcurrentDictionary<ServerNode.Client, UserInfo>();
 		//UserInfo serverUser;
 
-		long botIDCounter = 10000000001L;
+		long botIDCounter = 10000000000L;
 		long botUniqueNameCounter = 1;
+		long directConnectionUserCounter = 20000000000L;
 
 		///////////////////////////////////////////
 
 		public class UserInfo
 		{
-			//long userID;
-			//string username;
 			ServerNode.Client client;
-
 			long botUserID;
 			string botUsername = "";
 
 			//
 
-			internal UserInfo( /*long userID, string username, */ServerNode.Client client )
+			internal UserInfo( ServerNode.Client client )
 			{
-				//this.userID = userID;
-				//this.username = username;
 				this.client = client;
 			}
 
@@ -59,31 +61,10 @@ namespace NeoAxis
 
 			public override string ToString()
 			{
-				string address;
 				if( client != null )
-				{
-					if( client.RemoteEndPoint != null )
-						address = client.RemoteEndPoint.ToString();
-					else
-						address = "Unknown address";
-				}
+					return $"{Username} ({client.GetAddressText()})";
 				else
-					address = "No connection";
-
-				return string.Format( "{0} ({1})", Username, address );
-
-
-				//string ipAddressText;
-				//if( connectedNode != null )
-				//{
-				//	IPAddress ipAddress = IPAddress.None;
-				//	if( connectedNode.RemoteEndPoint != null )
-				//		ipAddress = connectedNode.RemoteEndPoint.Address;
-				//	ipAddressText = ipAddress.ToString();
-				//}
-				//else
-				//	ipAddressText = "Local";
-				//return string.Format( "{0} ({1})", Username, ipAddressText );
+					return Username;
 			}
 
 			public bool Bot
@@ -106,15 +87,18 @@ namespace NeoAxis
 		//public delegate void UpdateUserDelegate( ServerNetworkService_Users sender, UserInfo user, ref string name );
 		//public event UpdateUserDelegate UpdateUserEvent;
 
+		public delegate void GetShareUserWithAnotherEventDelegate( ServerNetworkService_Users sender, UserInfo tellToThisUser, UserInfo aboutThisUser, ref bool share );
+		public event GetShareUserWithAnotherEventDelegate GetShareUserWithAnotherEvent;
+
 		///////////////////////////////////////////
 
 		public ServerNetworkService_Users()
 			: base( "Users", 2 )
 		{
 			//register message types
-			RegisterMessageType( "AddUserToClient", 1 );
-			RegisterMessageType( "RemoveUserToClient", 2 );
-			RegisterMessageType( "UpdateObjectControlledByPlayerToClient", 3 );
+			addUserToClient = RegisterMessageType( "AddUserToClient", 1 );
+			removeUserToClient = RegisterMessageType( "RemoveUserToClient", 2 );
+			updateObjectControlledByPlayerToClient = RegisterMessageType( "UpdateObjectControlledByPlayerToClient", 3 );
 			//RegisterMessageType( "UpdateUserToClient", 3 );
 		}
 
@@ -142,11 +126,6 @@ namespace NeoAxis
 			return null;
 		}
 
-		//public UserInfo ServerUser
-		//{
-		//	get { return serverUser; }
-		//}
-
 		public UserInfo GetUser( ServerNode.Client client )
 		{
 			if( usersByClient.TryGetValue( client, out var user ) )
@@ -154,70 +133,64 @@ namespace NeoAxis
 			return null;
 		}
 
-		//uint GetFreeUserIdentifier()
+		//public UserInfo ServerUser
 		//{
-		//	uint identifier = 1;
-		//	while( usersByIdentifier.ContainsKey( identifier ) )
-		//		identifier++;
-		//	return identifier;
+		//	get { return serverUser; }
 		//}
 
-		public UserInfo AddUser( ServerNode.Client client )
-		//UserInfo CreateUser( string name, NetworkNode.ConnectedNode connectedNode )
+		public bool GetShareUserWithAnother( UserInfo tellToThisUser, UserInfo aboutThisUser )
 		{
-			//uint identifier = GetFreeUserIdentifier();
+			var share = true;
+			GetShareUserWithAnotherEvent?.Invoke( this, tellToThisUser, aboutThisUser, ref share );
+			return share;
+		}
 
-			var newUser = new UserInfo( /*identifier, name, */client );
+		public UserInfo AddUser( ServerNode.Client client )
+		{
+			if( GetUser( client ) != null )
+				Log.Fatal( "ServerNetworkService_Users: AddUser: GetUser( client ) != null." );
 
-			usersByID.Add( newUser.UserID, newUser );
+			var newUser = new UserInfo( client );
+
+			usersByID[ newUser.UserID ] = newUser;
 			if( newUser.Client != null )
-				usersByClient.Add( newUser.Client, newUser );
+				usersByClient[ newUser.Client ] = newUser;
 
 			{
-				var messageType = GetMessageType( "AddUserToClient" );
-
-				//!!!!необязательно всем
-
 				//send event about new user to the all users
 				foreach( var user in Users )
 				{
-					if( user.Client != null )
+					if( user.Client != null && ( user == newUser || GetShareUserWithAnother( user, newUser ) ) )
 					{
 						bool thisUserFlag = user == newUser;
 
-						var writer = BeginMessage( user.Client, messageType );
-						writer.Write( newUser.UserID );//writer.WriteVariableUInt64( (ulong)newUser.UserID );
-						writer.Write( newUser.Username );
-						writer.Write( newUser.Bot );
-						writer.Write( thisUserFlag );
-
+						var m = BeginMessage( user.Client, addUserToClient );
+						m.Writer.WriteVariableInt64( newUser.UserID ); //m.Writer.Write( newUser.UserID );
+						m.Writer.Write( newUser.Username );
+						m.Writer.Write( newUser.Bot );
+						m.Writer.Write( thisUserFlag );
 						//custom data
-						writer.Write( newUser.ReferenceToObjectControlledByPlayer );
-
-						EndMessage();
+						m.Writer.Write( newUser.ReferenceToObjectControlledByPlayer );
+						m.End();
 					}
 				}
-
-				//!!!!необязательно всем
 
 				if( newUser.Client != null )
 				{
 					//send list of users to new user
 					foreach( var user in Users )
 					{
-						if( user == newUser )
-							continue;
-
-						var writer = BeginMessage( newUser.Client, messageType );
-						writer.Write( user.UserID );//writer.WriteVariableUInt64( (ulong)user.UserID );
-						writer.Write( user.Username );
-						writer.Write( user.Bot );
-						writer.Write( false );//this user flag
-
-						//custom data
-						writer.Write( user.ReferenceToObjectControlledByPlayer );
-
-						EndMessage();
+						if( user != newUser && GetShareUserWithAnother( newUser, user ) )
+						{
+							var m = BeginMessage( newUser.Client, addUserToClient );
+							m.Writer.WriteVariableInt64( user.UserID );//m.Writer.Write( user.UserID );
+							m.Writer.Write( user.Username );
+							m.Writer.Write( user.Bot );
+							m.Writer.Write( false );//this user flag
+													//custom data
+							m.Writer.Write( user.ReferenceToObjectControlledByPlayer );
+							m.End();
+						}
 					}
 				}
 			}
@@ -236,33 +209,28 @@ namespace NeoAxis
 				botUniqueNameCounter++;
 			}
 
-			var userID = botIDCounter;
-			botIDCounter++;
+			var userID = Interlocked.Increment( ref botIDCounter );
+			//var userID = botIDCounter;
+			//botIDCounter++;
 
 			var newUser = new UserInfo( userID, username2 );
 			newUser.AnyData = anyData;
 
-			usersByID.Add( newUser.UserID, newUser );
+			usersByID[ newUser.UserID ] = newUser;
 
+			//send event about new user to the all users
+			foreach( var user in Users )
 			{
-				var messageType = GetMessageType( "AddUserToClient" );
-
-				//!!!!необязательно всем
-
-				//send event about new user to the all users
-				foreach( var user in Users )
+				if( user.Client != null && ( user == newUser || GetShareUserWithAnother( user, newUser ) ) )
 				{
-					if( user.Client != null )
-					{
-						bool thisUserFlag = user == newUser;
+					bool thisUserFlag = user == newUser;
 
-						var writer = BeginMessage( user.Client, messageType );
-						writer.Write( newUser.UserID );//writer.WriteVariableUInt64( (ulong)newUser.UserID );
-						writer.Write( newUser.Username );
-						writer.Write( newUser.Bot );
-						writer.Write( thisUserFlag );
-						EndMessage();
-					}
+					var m = BeginMessage( user.Client, addUserToClient );
+					m.Writer.WriteVariableInt64( newUser.UserID );//m.Writer.Write( newUser.UserID );
+					m.Writer.Write( newUser.Username );
+					m.Writer.Write( newUser.Bot );
+					m.Writer.Write( thisUserFlag );
+					m.End();
 				}
 			}
 
@@ -290,44 +258,40 @@ namespace NeoAxis
 			//check already removed
 			if( !usersByID.ContainsKey( user.UserID ) )
 				return;
-			//if( !usersByID.ContainsValue( user ) )
-			//	return;
 
-			UserRemoved?.Invoke( this, user );
+			//moved down
+			//UserRemoved?.Invoke( this, user );
 
 			//remove user
-			usersByID.Remove( user.UserID );
+			usersByID.TryRemove( user.UserID, out _ );
 			if( user.Client != null )
-				usersByClient.Remove( user.Client );
+				usersByClient.TryRemove( user.Client, out _ );
 			//if( serverUser == user )
 			//	serverUser = null;
 
-
-			//!!!!необязательно всем
+			UserRemoved?.Invoke( this, user );
 
 			//send event to the all users
+			foreach( var toUser in Users )
 			{
-				var messageType = GetMessageType( "RemoveUserToClient" );
-
-				foreach( var toUser in Users )
+				if( toUser.Client != null && ( toUser == user || GetShareUserWithAnother( toUser, user ) ) )
 				{
-					if( toUser.Client != null )
-					{
-						var writer = BeginMessage( toUser.Client, messageType );
-						writer.Write( user.UserID );//writer.WriteVariableUInt64( (ulong)user.UserID );
-						EndMessage();
-					}
+					var m = BeginMessage( toUser.Client, removeUserToClient );
+					m.Writer.WriteVariableInt64( user.UserID );//m.Writer.Write( user.UserID );
+					m.End();
 				}
 			}
 		}
 
-		public long GetFreeUserID()
+		public long GetDirectConnectionFreeUserID()
 		{
-			for( long userID = 1; ; userID++ )
-			{
-				if( GetUser( userID ) == null )
-					return userID;
-			}
+			return Interlocked.Increment( ref directConnectionUserCounter );
+
+			//for( long userID = 1; ; userID++ )
+			//{
+			//	if( GetUser( userID ) == null )
+			//		return userID;
+			//}
 		}
 
 		public void UpdateObjectControlledByPlayerToClient( UserInfo user, string referenceToObjectControlledByPlayer )
@@ -337,20 +301,16 @@ namespace NeoAxis
 
 			//send update to clients
 			{
-				//!!!!можно отправлять не всем
-
-				//!!!!всем сразу отправлять одним BeginMessage. где еще так
-
-				var messageType = GetMessageType( "UpdateObjectControlledByPlayerToClient" );
+				//broadcast message? where else
 
 				foreach( var toUser in Users )
 				{
-					if( toUser.Client != null )
+					if( toUser.Client != null && ( toUser == user || GetShareUserWithAnother( toUser, user ) ) )
 					{
-						var writer = BeginMessage( toUser.Client, messageType );
-						writer.Write( user.UserID );
-						writer.Write( referenceToObjectControlledByPlayer );
-						EndMessage();
+						var m = BeginMessage( toUser.Client, updateObjectControlledByPlayerToClient );
+						m.Writer.WriteVariableInt64( user.UserID ); //m.Writer.Write( user.UserID );
+						m.Writer.Write( referenceToObjectControlledByPlayer );
+						m.End();
 					}
 				}
 			}
@@ -383,13 +343,11 @@ namespace NeoAxis
 		//}
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	public class ClientNetworkService_Users : ClientService
 	{
-		//!!!!не все могут быть. только те которые сервер дал
-		//key: user identifier
-		Dictionary<long, UserInfo> usersByID = new Dictionary<long, UserInfo>();
+		ConcurrentDictionary<long, UserInfo> usersByID = new ConcurrentDictionary<long, UserInfo>();
 		UserInfo thisUser;
 
 		///////////////////////////////////////////
@@ -399,17 +357,19 @@ namespace NeoAxis
 			long userID;
 			string username;
 			bool bot;
+			bool thisUserFlag;
 
 			//custom data
 			internal string referenceToObjectControlledByPlayer = "";
 
 			//
 
-			internal UserInfo( long userID, string username, bool bot )
+			internal UserInfo( long userID, string username, bool bot, bool thisUserFlag )
 			{
 				this.userID = userID;
 				this.username = username;
 				this.bot = bot;
+				this.thisUserFlag = thisUserFlag;
 			}
 
 			public long UserID
@@ -428,6 +388,11 @@ namespace NeoAxis
 				get { return bot; }
 			}
 
+			public bool ThisUserFlag
+			{
+				get { return thisUserFlag; }
+			}
+
 			public override string ToString()
 			{
 				return Username;
@@ -442,8 +407,8 @@ namespace NeoAxis
 		///////////////////////////////////////////
 
 		public delegate void AddRemoveUserDelegate( ClientNetworkService_Users sender, UserInfo user );
-		public event AddRemoveUserDelegate AddUserEvent;
-		public event AddRemoveUserDelegate RemoveUserEvent;
+		public event AddRemoveUserDelegate UserAdded;
+		public event AddRemoveUserDelegate UserRemoved;
 		//public event AddRemoveUserDelegate UpdateUserEvent;
 
 		///////////////////////////////////////////
@@ -486,13 +451,13 @@ namespace NeoAxis
 		bool ReceiveMessage_AddUserToClient( MessageType messageType, ArrayDataReader reader, ref string additionalErrorMessage )
 		{
 			//get data from message
-			var userID = reader.ReadInt64();//long userID = (long)reader.ReadVariableUInt64();
-			var username = reader.ReadString();
+			var userID = reader.ReadVariableInt64();//var userID = reader.ReadInt64();
+			var username = reader.ReadString() ?? string.Empty;
 			var bot = reader.ReadBoolean();
 			bool thisUserFlag = reader.ReadBoolean();
 
 			//custom data
-			var referenceToObjectControlledByPlayer = reader.ReadString();
+			var referenceToObjectControlledByPlayer = reader.ReadString() ?? string.Empty;
 
 			if( !reader.Complete() )
 				return false;
@@ -506,7 +471,7 @@ namespace NeoAxis
 		bool ReceiveMessage_RemoveUserToClient( MessageType messageType, ArrayDataReader reader, ref string additionalErrorMessage )
 		{
 			//get data from message
-			var userID = reader.ReadInt64();//long userID = (long)reader.ReadVariableUInt64();
+			var userID = reader.ReadVariableInt64(); //var userID = reader.ReadInt64();
 			if( !reader.Complete() )
 				return false;
 
@@ -536,25 +501,23 @@ namespace NeoAxis
 
 		UserInfo AddUser( long userID, string username, bool bot, bool thisUserFlag )
 		{
-			var user = new UserInfo( userID, username, bot );
-			usersByID.Add( userID, user );
-
+			var user = new UserInfo( userID, username, bot, thisUserFlag );
+			usersByID[ userID ] = user;
 			if( thisUserFlag )
 				thisUser = user;
 
-			AddUserEvent?.Invoke( this, user );
+			UserAdded?.Invoke( this, user );
 
 			return user;
 		}
 
 		void RemoveUser( UserInfo user )
 		{
-			RemoveUserEvent?.Invoke( this, user );
-
-			usersByID.Remove( user.UserID );
-
+			usersByID.TryRemove( user.UserID, out _ );
 			if( thisUser == user )
 				thisUser = null;
+
+			UserRemoved?.Invoke( this, user );
 		}
 
 		public UserInfo ThisUser
@@ -565,8 +528,8 @@ namespace NeoAxis
 		bool ReceiveMessage_UpdateObjectControlledByPlayerToClient( MessageType messageType, ArrayDataReader reader, ref string additionalErrorMessage )
 		{
 			//get data from message
-			var userID = reader.ReadInt64();
-			var referenceToObjectControlledByPlayer = reader.ReadString();
+			var userID = reader.ReadVariableInt64();//var userID = reader.ReadInt64();
+			var referenceToObjectControlledByPlayer = reader.ReadString() ?? string.Empty;
 			if( !reader.Complete() )
 				return false;
 
@@ -578,7 +541,7 @@ namespace NeoAxis
 
 		public UserInfo GetUserByObjectControlledByPlayer( string referenceToObjectControlledByPlayer )
 		{
-			//!!!!slowly?
+			//slowly?
 
 			foreach( var user in usersByID.Values )
 			{

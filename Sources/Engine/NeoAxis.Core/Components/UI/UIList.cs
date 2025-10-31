@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using System.ComponentModel;
+using System.Linq;
 
 namespace NeoAxis
 {
@@ -12,7 +13,11 @@ namespace NeoAxis
 	/// </summary>
 	public class UIList : UIControl
 	{
+		List<ItemData> items = new List<ItemData>();
 		object touchDown;
+		object getAddItemsLock = new object();
+
+		/////////////////////////////////////////
 
 		[Browsable( false )]
 		public int NeedEnsureVisibleInStyle { get; set; } = -1;
@@ -65,6 +70,32 @@ namespace NeoAxis
 		public event Action<UIList> AlwaysShowScrollChanged;
 		ReferenceField<bool> _alwaysShowScroll = false;
 
+		/// <summary>
+		/// Whether to allow multiple selection of items.
+		/// </summary>
+		[DefaultValue( false )]
+		public Reference<bool> Multiselect
+		{
+			get { if( _multiselect.BeginGet() ) Multiselect = _multiselect.Get( this ); return _multiselect.value; }
+			set { if( _multiselect.BeginSet( this, ref value ) ) { try { MultiselectChanged?.Invoke( this ); } finally { _multiselect.EndSet(); } } }
+		}
+		/// <summary>Occurs when the <see cref="Multiselect"/> property value changes.</summary>
+		public event Action<UIList> MultiselectChanged;
+		ReferenceField<bool> _multiselect = false;
+
+		/// <summary>
+		/// Whether to enable checkboxes for each item in the list.
+		/// </summary>
+		[DefaultValue( false )]
+		public Reference<bool> Checkboxes
+		{
+			get { if( _checkboxes.BeginGet() ) Checkboxes = _checkboxes.Get( this ); return _checkboxes.value; }
+			set { if( _checkboxes.BeginSet( this, ref value ) ) { try { CheckboxesChanged?.Invoke( this ); } finally { _checkboxes.EndSet(); } } }
+		}
+		/// <summary>Occurs when the <see cref="Checkboxes"/> property value changes.</summary>
+		public event Action<UIList> CheckboxesChanged;
+		ReferenceField<bool> _checkboxes = false;
+
 		//!!!!
 		////UpdateActiveStateOfSelectedItem();
 		///// <summary>
@@ -79,18 +110,31 @@ namespace NeoAxis
 		//public event Action<UIList> HideSelectionWhenDisabledChanged;
 		//ReferenceField<bool> _hideSelectionWhenDisabled = false;
 
-		//!!!!string? но нужен редактор
 		/// <summary>
 		/// The list of items.
 		/// </summary>
+		[Cloneable( CloneType.Deep )]
+		public IReadOnlyList<ItemData> Items
+		{
+			get { return items; }
+		}
+
+		/// <summary>
+		/// The list of items specified as text. Used in editor.
+		/// </summary>
 		[Serialize]
 		[Cloneable( CloneType.Deep )]
-		public List<string> Items { get; set; } = new List<string>();
-		//public List<object> Items { get; } = new List<object>();
+		[Browsable( true )]
+		public List<string> ItemsAsText { get; set; } = new List<string>();
 
-		//!!!!
-		//[Browsable( false )]
-		//public List<object> ItemTags { get; set; } = new List<object>();
+		///////////////////////////////////////////////
+
+		public class ItemData
+		{
+			public object Value;
+			public object Tag;
+			public UICheck.CheckValue Checked;
+		}
 
 		///////////////////////////////////////////////
 
@@ -116,15 +160,39 @@ namespace NeoAxis
 		public event SelectedIndexChangedDelegate SelectedIndexChanged;
 
 		/// <summary>
-		/// The selected item.
+		/// The indexes of selected items for Multiselect mode.
 		/// </summary>
 		[Browsable( false )]
-		public string SelectedItem
+		public int[] SelectedIndices
+		{
+			get { return selectedIndices; }
+			set
+			{
+				if( selectedIndices.SequenceEqual( value ) )
+					return;
+				selectedIndices = value;
+				SelectedIndicesChanged?.Invoke( this );
+			}
+		}
+		int[] selectedIndices = Array.Empty<int>();
+
+		public delegate void SelectedIndicesChangedDelegate( UIList sender );
+		public event SelectedIndicesChangedDelegate SelectedIndicesChanged;
+
+		/// <summary>
+		/// Get the selected item.
+		/// </summary>
+		[Browsable( false )]
+		public ItemData SelectedItem
 		{
 			get
 			{
-				if( SelectedIndex >= 0 && SelectedIndex < Items.Count )
-					return Items[ SelectedIndex ];
+				try
+				{
+					if( SelectedIndex >= 0 && SelectedIndex < Items.Count )
+						return items[ SelectedIndex ];
+				}
+				catch { }
 				return null;
 			}
 		}
@@ -289,6 +357,34 @@ namespace NeoAxis
 			get { return EnabledInHierarchy && VisibleInHierarchy && !ReadOnlyInHierarchy; }
 		}
 
+		void UpdateSelectedIndices( int newIndex )
+		{
+			if( Multiselect && SelectedIndex != -1 && newIndex != -1 )
+			{
+				var control = ParentContainer.Viewport.IsKeyPressed( EKeys.Control );
+				var shift = ParentContainer.Viewport.IsKeyPressed( EKeys.Shift );
+
+				var list = new List<int>( ( control || shift ) ? selectedIndices : Array.Empty<int>() );
+
+				if( shift )
+				{
+					var indicesBetween = new RangeI( Math.Min( SelectedIndex, newIndex ), Math.Max( SelectedIndex, newIndex ) );
+					for( int n = indicesBetween.Minimum; n <= indicesBetween.Maximum; n++ )
+					{
+						if( !list.Contains( n ) )
+							list.Add( n );
+					}
+				}
+				else
+				{
+					if( !list.Contains( newIndex ) )
+						list.Add( newIndex );
+				}
+
+				SelectedIndices = list.ToArray();
+			}
+		}
+
 		protected override bool OnKeyDown( KeyEvent e )
 		{
 			if( Focused )
@@ -302,6 +398,7 @@ namespace NeoAxis
 							index = 0;
 						if( index != SelectedIndex )
 						{
+							UpdateSelectedIndices( index );
 							SelectedIndex = index;
 							EnsureVisible( SelectedIndex );
 						}
@@ -315,6 +412,7 @@ namespace NeoAxis
 							index = Items.Count - 1;
 						if( index != SelectedIndex )
 						{
+							UpdateSelectedIndices( index );
 							SelectedIndex = index;
 							EnsureVisible( SelectedIndex );
 						}
@@ -326,6 +424,7 @@ namespace NeoAxis
 						var index = 0;
 						if( index != SelectedIndex )
 						{
+							UpdateSelectedIndices( index );
 							SelectedIndex = index;
 							EnsureVisible( SelectedIndex );
 						}
@@ -337,6 +436,7 @@ namespace NeoAxis
 						var index = Items.Count - 1;
 						if( index != SelectedIndex )
 						{
+							UpdateSelectedIndices( index );
 							SelectedIndex = index;
 							EnsureVisible( SelectedIndex );
 						}
@@ -357,6 +457,7 @@ namespace NeoAxis
 								index = 0;
 							if( index != SelectedIndex )
 							{
+								UpdateSelectedIndices( index );
 								SelectedIndex = index;
 								EnsureVisible( SelectedIndex );
 							}
@@ -378,12 +479,32 @@ namespace NeoAxis
 								index = Items.Count - 1;
 							if( index != SelectedIndex )
 							{
+								UpdateSelectedIndices( index );
 								SelectedIndex = index;
 								EnsureVisible( SelectedIndex );
 							}
 						}
 					}
 					return true;
+
+				case EKeys.Space:
+					{
+						if( Checkboxes )
+						{
+							//!!!!shift, control?
+
+							var allSelected = GetAllSelectedIndices();
+							var currentChecked = allSelected.Any( i => GetItem( i ).Checked == UICheck.CheckValue.Checked );
+
+							var newChecked = currentChecked ? UICheck.CheckValue.Unchecked : UICheck.CheckValue.Checked;
+							foreach( var index in allSelected )
+								items[ index ].Checked = newChecked;
+
+							return true;
+						}
+					}
+					break;
+
 				}
 			}
 
@@ -446,19 +567,51 @@ namespace NeoAxis
 		protected override bool OnMouseDown( EMouseButtons button )
 		{
 			var cursorInsideArea = CursorIsInArea();
-			if( button == EMouseButtons.Left && VisibleInHierarchy && cursorInsideArea && EnabledInHierarchy && !ReadOnlyInHierarchy )
+			if(/* button == EMouseButtons.Left &&*/ VisibleInHierarchy && cursorInsideArea && EnabledInHierarchy && !ReadOnlyInHierarchy )
 			{
 				Focus();
 
 				var renderer = ParentContainer?.Viewport.CanvasRenderer;
 				if( renderer != null )
 				{
-					var index = GetListItemIndexByScreenPosition( ParentContainer.MousePosition );
-					if( index != -1 )
+					if( button == EMouseButtons.Left )//|| button == EMouseButtons.Right ) //!!!!new
 					{
-						SelectedIndex = index;
-						//CallItemMouseClick( button );
-						return true;
+						var overCheckbox = false;
+						var index = GetListItemIndexByScreenPosition( ParentContainer.MousePosition, ref overCheckbox );
+						if( index != -1 )
+						{
+							UpdateSelectedIndices( index );
+
+							////SelectedIndices
+							//if( Multiselect && SelectedIndex != -1 && index != -1 ) //if( SelectedIndex != index && Multiselect )
+							//{
+							//	var control = ParentContainer.Viewport.IsKeyPressed( EKeys.Control );
+							//	var shift = ParentContainer.Viewport.IsKeyPressed( EKeys.Shift );
+
+							//	var list = new List<int>( ( control || shift ) ? selectedIndices : Array.Empty<int>() );
+
+							//	if( shift )
+							//	{
+							//		var indicesBetween = new RangeI( Math.Min( SelectedIndex, index ), Math.Max( SelectedIndex, index ) );
+							//		for( int n = indicesBetween.Minimum; n <= indicesBetween.Maximum; n++ )
+							//		{
+							//			if( !list.Contains( n ) )
+							//				list.Add( n );
+							//		}
+							//	}
+							//	else
+							//	{
+							//		if( !list.Contains( index ) )
+							//			list.Add( index );
+							//	}
+
+							//	SelectedIndices = list.ToArray();
+							//}
+
+							SelectedIndex = index;
+							//CallItemMouseClick( button );
+							return true;
+						}
 					}
 
 					//return true;
@@ -471,18 +624,19 @@ namespace NeoAxis
 		protected override bool OnMouseUp( EMouseButtons button )
 		{
 			var cursorInsideArea = CursorIsInArea();
-			if( button == EMouseButtons.Left && VisibleInHierarchy && cursorInsideArea && EnabledInHierarchy && !ReadOnlyInHierarchy )
+			if( /*button == EMouseButtons.Left &&*/ VisibleInHierarchy && cursorInsideArea && EnabledInHierarchy && !ReadOnlyInHierarchy )
 			{
 				Focus();
 
 				var renderer = ParentContainer?.Viewport.CanvasRenderer;
 				if( renderer != null )
 				{
-					var index = GetListItemIndexByScreenPosition( ParentContainer.MousePosition );
-					if( index != -1 && index == SelectedIndex )
+					var overCheckbox = false;
+					var index = GetListItemIndexByScreenPosition( ParentContainer.MousePosition, ref overCheckbox );
+					if( index != -1 && GetAllSelectedIndices().Contains( index ) )
 					{
-						CallItemMouseClick( button );
-						return true;
+						if( CallItemMouseClick( button, overCheckbox ) )
+							return true;
 					}
 
 					//return true;
@@ -495,12 +649,13 @@ namespace NeoAxis
 		protected override bool OnMouseDoubleClick( EMouseButtons button )
 		{
 			var cursorInsideArea = CursorIsInArea();
-			if( button == EMouseButtons.Left && VisibleInHierarchy && cursorInsideArea && EnabledInHierarchy && !ReadOnlyInHierarchy )
+			if( /*button == EMouseButtons.Left &&*/ VisibleInHierarchy && cursorInsideArea && EnabledInHierarchy && !ReadOnlyInHierarchy )
 			{
 				var renderer = ParentContainer?.Viewport.CanvasRenderer;
 				if( renderer != null )
 				{
-					var index = GetListItemIndexByScreenPosition( ParentContainer.MousePosition );
+					var overCheckbox = false;
+					var index = GetListItemIndexByScreenPosition( ParentContainer.MousePosition, ref overCheckbox );
 					if( index != -1 && SelectedIndex == index )
 					{
 						if( CallItemMouseDoubleClick( button ) )//, index ) )
@@ -533,9 +688,13 @@ namespace NeoAxis
 
 							//start touch
 							touchDown = e.PointerIdentifier;
-							var index = GetListItemIndexByScreenPosition( e.Position );
+							var overCheckbox = false;
+							var index = GetListItemIndexByScreenPosition( e.Position, ref overCheckbox );
 							if( index != -1 )
+							{
+								UpdateSelectedIndices( index );
 								SelectedIndex = index;
+							}
 						} );
 					e.TouchDownRequestToControlActions.Add( item );
 				}
@@ -549,9 +708,13 @@ namespace NeoAxis
 			case TouchData.ActionEnum.Move:
 				if( touchDown != null && ReferenceEquals( e.PointerIdentifier, touchDown ) )
 				{
-					var index = GetListItemIndexByScreenPosition( e.Position );
+					var overCheckbox = false;
+					var index = GetListItemIndexByScreenPosition( e.Position, ref overCheckbox );
 					if( index != -1 )
+					{
+						UpdateSelectedIndices( index );
 						SelectedIndex = index;
+					}
 				}
 				break;
 
@@ -565,9 +728,9 @@ namespace NeoAxis
 			return base.OnTouch( e );
 		}
 
-		public int GetListItemIndexByScreenPosition( Vector2 position )
+		public int GetListItemIndexByScreenPosition( Vector2 position, ref bool overCheckbox )
 		{
-			return GetStyle().GetListItemIndexByScreenPosition( this, position );
+			return GetStyle().GetListItemIndexByScreenPosition( this, position, ref overCheckbox );
 		}
 
 		/////////////////////////////////////////
@@ -577,8 +740,81 @@ namespace NeoAxis
 		public delegate void ItemMouseClickDelegate( UIControl sender, EMouseButtons button, ref bool handled );
 		public event ItemMouseClickDelegate ItemMouseClick;
 
-		bool CallItemMouseClick( EMouseButtons button )
+		bool CallItemMouseClick( EMouseButtons button, bool overCheckbox )
 		{
+			//update checkbox status
+			if( Checkboxes && overCheckbox && SelectedIndex >= 0 )
+			{
+				try
+				{
+					// Multiselect logic for checkboxes
+					if( Multiselect )
+					{
+						var control = ParentContainer?.Viewport.IsKeyPressed( EKeys.Control ) ?? false;
+						var shift = ParentContainer?.Viewport.IsKeyPressed( EKeys.Shift ) ?? false;
+
+						if( shift && SelectedIndices.Length > 0 )
+						{
+							// Determine new status: if all selected are checked, uncheck; else check all
+							bool allChecked = true;
+							foreach( int idx in SelectedIndices )
+							{
+								if( items[ idx ].Checked != UICheck.CheckValue.Checked )
+								{
+									allChecked = false;
+									break;
+								}
+							}
+							var newStatus = allChecked ? UICheck.CheckValue.Unchecked : UICheck.CheckValue.Checked;
+							foreach( int idx in SelectedIndices )
+								items[ idx ].Checked = newStatus;
+						}
+						else if( control )
+						{
+							// Toggle only the current item
+							var status = items[ SelectedIndex ].Checked;
+							if( status == UICheck.CheckValue.Indeterminate )
+								status = UICheck.CheckValue.Unchecked;
+							if( status == UICheck.CheckValue.Unchecked )
+								status = UICheck.CheckValue.Checked;
+							else
+								status = UICheck.CheckValue.Unchecked;
+							items[ SelectedIndex ].Checked = status;
+						}
+						else
+						{
+							// Drop all enabled checkboxes except the current
+
+							var status = items[ SelectedIndex ].Checked;
+
+							for( int i = 0; i < items.Count; i++ )
+								items[ i ].Checked = UICheck.CheckValue.Unchecked;
+
+							if( status == UICheck.CheckValue.Indeterminate )
+								status = UICheck.CheckValue.Unchecked;
+							if( status == UICheck.CheckValue.Unchecked )
+								status = UICheck.CheckValue.Checked;
+							else
+								status = UICheck.CheckValue.Unchecked;
+							items[ SelectedIndex ].Checked = status;
+						}
+					}
+					else
+					{
+						// Single selection logic
+						var status = items[ SelectedIndex ].Checked;
+						if( status == UICheck.CheckValue.Indeterminate )
+							status = UICheck.CheckValue.Unchecked;
+						if( status == UICheck.CheckValue.Unchecked )
+							status = UICheck.CheckValue.Checked;
+						else
+							status = UICheck.CheckValue.Unchecked;
+						items[ SelectedIndex ].Checked = status;
+					}
+				}
+				catch { }
+			}
+
 			if( OnItemMouseClick( button ) )
 				return true;
 
@@ -612,11 +848,11 @@ namespace NeoAxis
 
 		/////////////////////////////////////////
 
-		public bool SelectItem( string value )
+		public bool SelectItem( object value )
 		{
 			for( int n = 0; n < Items.Count; n++ )
 			{
-				if( Items[ n ] == value )
+				if( items[ n ].Value == value )
 				{
 					SelectedIndex = n;
 					return true;
@@ -628,6 +864,110 @@ namespace NeoAxis
 		public override CoverOtherControlsEnum CoverOtherControls
 		{
 			get { return CoverOtherControlsEnum.OnlyBehind; }
+		}
+
+		public ItemData GetItem( int index )
+		{
+			try
+			{
+				if( index >= 0 && index < Items.Count )
+					return items[ index ];
+			}
+			catch { }
+			return null;
+		}
+
+		public void ClearItems()
+		{
+			lock( getAddItemsLock )
+				items.Clear();
+		}
+
+		public int AddItem( object value, object tag = null, UICheck.CheckValue check = UICheck.CheckValue.Unchecked )
+		{
+			lock( getAddItemsLock )
+			{
+				var item = new ItemData { Value = value, Tag = tag, Checked = check };
+				items.Add( item );
+				return Items.Count - 1;
+			}
+		}
+
+		public void InsertItem( int index, object value, object tag = null, UICheck.CheckValue check = UICheck.CheckValue.Unchecked )
+		{
+			lock( getAddItemsLock )
+			{
+				var item = new ItemData { Value = value, Tag = tag, Checked = check };
+				items.Insert( index, item );
+			}
+		}
+
+		public void RemoveItem( int index )
+		{
+			lock( getAddItemsLock )
+			{
+				try
+				{
+					items.RemoveAt( index );
+				}
+				catch { }
+			}
+		}
+
+		/// <summary>
+		/// Get the indexes of selected items in Multiselect mode combined with current selected index.
+		/// </summary>
+		/// <returns></returns>
+		public int[] GetAllSelectedIndices()
+		{
+			if( SelectedIndices.Length > 0 )
+			{
+				if( SelectedIndex != -1 )
+				{
+					var list = new List<int>( SelectedIndices );
+					if( !list.Contains( SelectedIndex ) )
+						list.Add( SelectedIndex );
+					return list.ToArray();
+				}
+				else
+					return SelectedIndices;
+			}
+			else if( SelectedIndex != -1 )
+				return new int[] { SelectedIndex };
+			else
+				return Array.Empty<int>();
+		}
+
+		/// <summary>
+		/// Get the indexes of all checked items in Checkboxes mode.
+		/// </summary>
+		/// <returns></returns>
+		public int[] GetAllCheckedIndices()
+		{
+			var checkedIndices = new List<int>();
+			try
+			{
+				var itemCount = Items.Count;
+				for( int i = 0; i < itemCount; i++ )
+				{
+					var item = items[ i ];
+					if( item?.Checked == UICheck.CheckValue.Checked )
+						checkedIndices.Add( i );
+				}
+			}
+			catch { }
+			return checkedIndices.ToArray();
+		}
+
+		protected override void OnEnabledInSimulation()
+		{
+			base.OnEnabledInSimulation();
+
+			if( ItemsAsText.Count != 0 && Items.Count == 0 )
+			{
+				foreach( var s in ItemsAsText )
+					AddItem( s );
+			}
 		}
 	}
 }
