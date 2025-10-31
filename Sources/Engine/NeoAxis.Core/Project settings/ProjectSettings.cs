@@ -105,10 +105,10 @@ namespace NeoAxis
 				block.SetAttribute( "Name", "Rendering" );
 			}
 
-			{
-				var block = rootBlock.AddChild( ".component", "NeoAxis.ProjectSettingsPage_Repository" );
-				block.SetAttribute( "Name", "Repository" );
-			}
+			//{
+			//	var block = rootBlock.AddChild( ".component", "NeoAxis.ProjectSettingsPage_Repository" );
+			//	block.SetAttribute( "Name", "Repository" );
+			//}
 
 			if( !TextBlockUtility.SaveToRealFile( fileBlock, realFileName, out error ) )
 				return false;
