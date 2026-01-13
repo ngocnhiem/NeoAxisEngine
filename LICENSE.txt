@@ -26,7 +26,7 @@ F. Additional Content which is provided for an additional fee, can be redistribu
 
 G. Certain Additional Content is distributed under the "Free to use with NeoAxis" license. This means that the content can only be used with the Engine Code.
 
-H. This license agreement is suitable only for private companies. Companies with state participation require a special license.
+H. "NeoX Service" means a special case of this Agreement under which the Product may be distributed solely inside the NeoX cloud service.
 
 If you do not accept these conditions or it is not enforceable in your jurisdiction, then you may not use the software.
 
@@ -59,6 +59,8 @@ Licensee agrees that use of the Software is at their own risk. In no event shall
 "Technology" means any or all of the original or modified Engine Code and the Additional Content.
 
 "Engine Logo" means one of 4 images placed in NeoAxis Engine software by paths "Assets\Base\UI\Images\NeoAxisLogo_DarkBackground.png", "Assets\Base\UI\Images\NeoAxisLogo_DarkBackground_Small.png", "Assets\Base\UI\Images\NeoAxisLogo_LightBackground.png", "Assets\Base\UI\Images\NeoAxisLogo_LightBackground_Small.png".
+
+"NeoX Service" is a cloud service provided by NeoAxis Group Ltd. The NeoX cloud service is provided through the neoaxis.com website. It is based on the NeoAxis Engine code and license terms of this Agreement.
 
 8. MISCELLANEOUS
 
