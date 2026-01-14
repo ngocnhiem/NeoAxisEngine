@@ -37,6 +37,9 @@ BX_ERROR_RESULT(BGFX_ERROR_TEXTURE_VALIDATION,  BX_MAKEFOURCC('b', 'g', 0, 1) );
 BX_ERROR_RESULT(BGFX_ERROR_FRAME_BUFFER_VALIDATION, BX_MAKEFOURCC('b', 'g', 0, 2) );
 BX_ERROR_RESULT(BGFX_ERROR_IDENTIFIER_VALIDATION,   BX_MAKEFOURCC('b', 'g', 0, 3) );
 
+//!!!!betauser
+bool bgfxShutdowning = false;
+
 namespace bgfx
 {
 #define BGFX_API_THREAD_MAGIC UINT32_C(0x78666762)
@@ -2104,19 +2107,47 @@ namespace bgfx
 
 	void Context::shutdown()
 	{
+		//!!!!betauser
+		if (bgfxShutdowning)
+			return;
+
 		getCommandBuffer(CommandBuffer::RendererShutdownBegin);
 		frame();
 
-		destroyTransientVertexBuffer(m_submit->m_transientVb);
-		destroyTransientIndexBuffer(m_submit->m_transientIb);
+		//!!!!betauser
+		if (m_submit->m_transientVb)
+		{
+			destroyTransientVertexBuffer(m_submit->m_transientVb);
+			m_submit->m_transientVb = nullptr;
+		}
+		if (m_submit->m_transientIb)
+		{
+			destroyTransientIndexBuffer(m_submit->m_transientIb);
+			m_submit->m_transientIb = nullptr;
+		}
+		//destroyTransientVertexBuffer(m_submit->m_transientVb);
+		//destroyTransientIndexBuffer(m_submit->m_transientIb);
+
 		m_textVideoMemBlitter.shutdown();
 		m_clearQuad.shutdown();
 		frame();
 
 		if (BX_ENABLED(BGFX_CONFIG_MULTITHREADED) )
 		{
-			destroyTransientVertexBuffer(m_submit->m_transientVb);
-			destroyTransientIndexBuffer(m_submit->m_transientIb);
+			//!!!!betauser
+			if (m_submit->m_transientVb)
+			{
+				destroyTransientVertexBuffer(m_submit->m_transientVb);
+				m_submit->m_transientVb = nullptr;
+			}
+			if (m_submit->m_transientIb)
+			{
+				destroyTransientIndexBuffer(m_submit->m_transientIb);
+				m_submit->m_transientIb = nullptr;
+			}
+			//destroyTransientVertexBuffer(m_submit->m_transientVb);
+			//destroyTransientIndexBuffer(m_submit->m_transientIb);
+
 			frame();
 		}
 
@@ -2354,6 +2385,10 @@ namespace bgfx
 
 	uint32_t Context::frame(bool _capture)
 	{
+		//!!!!betauser
+		if(bgfxShutdowning)
+			return m_submit->m_frameNum;
+
 		m_encoder[0].end(true);
 
 #if BGFX_CONFIG_MULTITHREADED
@@ -3667,6 +3702,9 @@ namespace bgfx
 
 	void shutdown()
 	{
+		//!!!!betauser
+		bgfxShutdowning = true;
+
 		BX_TRACE("Shutdown...");
 
 		BGFX_CHECK_API_THREAD();

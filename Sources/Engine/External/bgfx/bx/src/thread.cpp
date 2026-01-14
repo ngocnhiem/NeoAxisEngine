@@ -12,6 +12,9 @@
 #	include <bx/string.h>
 #endif
 
+ //!!!!betauser
+extern bool bgfxShutdowning;
+
 #if BX_CRT_NONE
 #	include "crt0.h"
 #elif  BX_PLATFORM_ANDROID \
@@ -117,6 +120,10 @@ namespace bx
 
 	Thread::~Thread()
 	{
+		//!!!!betauser
+		if (bgfxShutdowning)
+			return;
+
 		if (m_running)
 		{
 			shutdown();
